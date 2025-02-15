@@ -1,0 +1,4 @@
+.vscode/
+libspinnaker_stream.a
+spinnaker_stream
+spinnaker_stream.o
