@@ -4,23 +4,34 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
+#include <chrono>
 
 #include "convert_rgb24_to_yuyv_cuda.h"
 
 extern "C"
 {
 
-    // Function to configure the virtual V4L2 device for YUYV422 format
     int configure_video_device(int video_fd, int width, int height, __u32 pixel_format)
     {
         struct v4l2_format vfmt = {};
         vfmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
         vfmt.fmt.pix.width = width;
         vfmt.fmt.pix.height = height;
-        vfmt.fmt.pix.pixelformat = pixel_format; // Set pixel format to YUYV422
+        vfmt.fmt.pix.pixelformat = pixel_format;
         vfmt.fmt.pix.field = V4L2_FIELD_NONE;
-        vfmt.fmt.pix.bytesperline = width * 2;       // YUYV422 = 2 bytes per pixel
-        vfmt.fmt.pix.sizeimage = width * height * 2; // 3 bytes per pixel (YUYV422)
+        switch (pixel_format)
+        {
+        case V4L2_PIX_FMT_RGB24:
+            vfmt.fmt.pix.bytesperline = width * 3;
+            vfmt.fmt.pix.sizeimage = width * height * 3;
+            break;
+        case V4L2_PIX_FMT_YUYV:
+            vfmt.fmt.pix.bytesperline = width * 2;
+            vfmt.fmt.pix.sizeimage = width * height * 2;
+            break;
+        default:
+            break;
+        }
 
         if (ioctl(video_fd, VIDIOC_S_FMT, &vfmt) < 0)
         {
@@ -100,7 +111,9 @@ extern "C"
         // Start capturing images
         camera->BeginAcquisition();
 
-        while (true)
+        // Capture 100 frames for testing
+        int count = 0;
+        while (count < 100)
         {
             Spinnaker::ImagePtr pImage = camera->GetNextImage();
             if (pImage->IsIncomplete())
@@ -125,6 +138,9 @@ extern "C"
             unsigned int width = pImage->GetWidth();
             unsigned int height = pImage->GetHeight();
 
+            // CPU time to convert BayerRG8 to RGB8
+            auto start = std::chrono::high_resolution_clock::now();
+
             // Handle BayerRG8 format: Convert BayerRG8 to RGB8
             if (pixelFormat == Spinnaker::PixelFormatEnums::PixelFormat_BayerRG8)
             {
@@ -137,12 +153,25 @@ extern "C"
                 imageData = static_cast<unsigned char *>(pImage->GetData());
             }
 
+            // CPU time to convert BayerRG8 to RGB8 in milliseconds
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
+            std::cout << "Conversion time: " << elapsed.count() * 1000 << " ms" << std::endl;
+
+            // CPU time to convert RGB24 to YUYV422
+            auto start1 = std::chrono::high_resolution_clock::now();
+
             // Allocate memory for YUYV422 data
             unsigned char *yuyv422 = new unsigned char[width * height * 2];
 
             // Convert RGB24 to YUYV422
             convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
-            std::cout << "Converted RGB8 to YUYV422" << std::endl;
+            std::cout << "Converted RGB24 to YUYV422" << std::endl;
+
+            // CPU time to convert RGB24 to YUYV422 in milliseconds
+            auto end1 = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed1 = end1 - start1;
+            std::cout << "Conversion time: " << elapsed1.count() * 1000 << " ms" << std::endl;
 
             // Configure the virtual video device for YUYV422
             if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_YUYV) != 0)
@@ -162,8 +191,11 @@ extern "C"
 
             delete[] yuyv422;
             pImage->Release();
+
+            count++;
         }
 
+        cleanup_cuda_buffers();
         camera->EndAcquisition();
         camera->DeInit();
         camList.Clear();
