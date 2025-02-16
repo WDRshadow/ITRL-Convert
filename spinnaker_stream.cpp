@@ -111,6 +111,9 @@ extern "C"
         // Start capturing images
         camera->BeginAcquisition();
 
+        // Allocate memory for YUYV422 data
+        unsigned char *yuyv422 = nullptr;
+
         // Capture 100 frames for testing
         int count = 0;
         while (count < 100)
@@ -162,7 +165,10 @@ extern "C"
             auto start1 = std::chrono::high_resolution_clock::now();
 
             // Allocate memory for YUYV422 data
-            unsigned char *yuyv422 = new unsigned char[width * height * 2];
+            if (yuyv422 == nullptr)
+            {
+                yuyv422 = new unsigned char[width * height * 2];
+            }
 
             // Convert RGB24 to YUYV422
             convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
@@ -177,7 +183,6 @@ extern "C"
             if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_YUYV) != 0)
             {
                 std::cerr << "Failed to configure virtual device" << std::endl;
-                delete[] yuyv422;
                 break;
             }
 
@@ -185,16 +190,15 @@ extern "C"
             if (write(video_fd, yuyv422, width * height * 2) == -1)
             {
                 std::cerr << "Error writing frame to virtual device" << std::endl;
-                delete[] yuyv422;
                 break;
             }
 
-            delete[] yuyv422;
             pImage->Release();
 
             count++;
         }
 
+        delete[] yuyv422;
         cleanup_cuda_buffers();
         camera->EndAcquisition();
         camera->DeInit();
