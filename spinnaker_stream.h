@@ -1,4 +1,3 @@
-#include <cstdint>
 #ifndef SPINNAKER_STREAM_H
 #define SPINNAKER_STREAM_H
 
