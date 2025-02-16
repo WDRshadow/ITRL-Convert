@@ -1,12 +1,11 @@
 rm libspinnaker_stream.a
 rm spinnaker_stream.o
 rm spinnaker_stream
+rm convert_rgb24_to_yuyv_cuda.o
 
-# nvcc -Xcompiler -fPIC -shared -o libconvert_rgb24_to_yuyv_cuda.so convert_rgb24_to_yuyv_cuda.cu
-# g++ -I. -I/usr/include/spinnaker -L/usr/lib -lSpinnaker -lstdc++ -L. -lconvert_rgb24_to_yuyv_cuda -c -o spinnaker_stream.o spinnaker_stream.cpp -Wl,-rpath=.
+nvcc -Xcompiler -fPIC -c convert_rgb24_to_yuyv_cuda.cu -o convert_rgb24_to_yuyv_cuda.o
+g++ -I. -I/usr/include/spinnaker -c -o spinnaker_stream.o spinnaker_stream.cpp
 
-g++ -I. -I/usr/include/spinnaker -L/usr/lib -lSpinnaker -lstdc++ -c -o spinnaker_stream.o spinnaker_stream.cpp
-
-ar rcs libspinnaker_stream.a spinnaker_stream.o
+ar rcs libspinnaker_stream.a spinnaker_stream.o convert_rgb24_to_yuyv_cuda.o
 
 go build spinnaker_stream.go

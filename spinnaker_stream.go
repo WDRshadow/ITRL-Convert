@@ -2,7 +2,7 @@ package main
 
 /*
 #cgo CXXFLAGS: -I/usr/include/spinnaker
-#cgo LDFLAGS: -L. -lspinnaker_stream -lSpinnaker -lstdc++
+#cgo LDFLAGS: -L. -lspinnaker_stream -lSpinnaker -lstdc++ -L/usr/local/cuda/lib64 -lcudart
 extern void capture_frames(const char* video_device);
 */
 import "C"

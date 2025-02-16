@@ -1,84 +1,64 @@
 #include <cuda_runtime.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <device_launch_parameters.h>
 
-#include "spinnaker_stream.h"
+#include "convert_rgb24_to_yuyv_cuda.h"
 
-// 颜色转换常量（整数运算）
-#define Y_R 77  // 0.299 * 256 ≈ 77
-#define Y_G 150 // 0.587 * 256 ≈ 150
-#define Y_B 29  // 0.114 * 256 ≈ 29
+#define Y_R 19595  // 0.299 * 65536
+#define Y_G 38470  // 0.587 * 65536
+#define Y_B 7471   // 0.114 * 65536
 
-#define U_R -38 // -0.14713 * 256 ≈ -38
-#define U_G -74 // -0.28886 * 256 ≈ -74
-#define U_B 112 // 0.436 * 256 ≈ 112
+#define U_R -11058 // -0.14713 * 65536
+#define U_G -21709 // -0.28886 * 65536
+#define U_B 32767  // 0.436 * 65536
 
-#define V_R 157  // 0.615 * 256 ≈ 157
-#define V_G -132 // -0.51499 * 256 ≈ -132
-#define V_B -25  // -0.10001 * 256 ≈ -25
+#define V_R 32767  // 0.615 * 65536
+#define V_G -27439 // -0.51499 * 65536
+#define V_B -5328  // -0.10001 * 65536
 
-// 计算 YUYV 格式的 CUDA 核心
-__global__ void convert_rgb24_to_yuyv_cuda(const uint8_t *rgb24, uint8_t *yuyv422, int width, int height)
-{
-    int idx = blockIdx.x * blockDim.x + threadIdx.x; // 线程索引（像素索引）
-    int idy = blockIdx.y * blockDim.y + threadIdx.y;
-    int pixel_index = (idy * width + idx) * 3; // RGB24 是 3 通道
+#define CLAMP(x) (x < 0 ? 0 : (x > 255 ? 255 : x))
 
-    if (idx >= width || idy >= height)
-        return; // 边界检查
+__global__ void convert_rgb24_to_yuyv_cuda_kernel(const unsigned char *rgb24, unsigned char *yuyv422, int width, int height) {
+    int x = (blockIdx.x * blockDim.x + threadIdx.x) * 2;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    // 获取 RGB 值
-    uint8_t r = rgb24[pixel_index];
-    uint8_t g = rgb24[pixel_index + 1];
-    uint8_t b = rgb24[pixel_index + 2];
+    if (x < width && y < height) {
+        int index_rgb = (y * width + x) * 3;
+        int index_yuyv = (y * width + x) * 2;
 
-    // 计算 Y
-    uint8_t y = (Y_R * r + Y_G * g + Y_B * b) >> 8;
+        unsigned char r0 = rgb24[index_rgb];
+        unsigned char g0 = rgb24[index_rgb + 1];
+        unsigned char b0 = rgb24[index_rgb + 2];
+        unsigned char r1 = rgb24[index_rgb + 3];
+        unsigned char g1 = rgb24[index_rgb + 4];
+        unsigned char b1 = rgb24[index_rgb + 5];
 
-    // 计算 U 和 V（每 2 像素计算 1 组 U/V）
-    uint8_t u = (U_R * r + U_G * g + U_B * b) >> 8;
-    uint8_t v = (V_R * r + V_G * g + V_B * b) >> 8;
+        unsigned char y0 = CLAMP((Y_R * r0 + Y_G * g0 + Y_B * b0) >> 16);
+        unsigned char y1 = CLAMP((Y_R * r1 + Y_G * g1 + Y_B * b1) >> 16);
+        unsigned char u = CLAMP((U_R * r0 + U_G * g0 + U_B * b0) >> 16) + 128;
+        unsigned char v = CLAMP((V_R * r0 + V_G * g0 + V_B * b0) >> 16) + 128;
 
-    // 存储到 YUYV422 格式
-    int yuyv_index = (idy * width + idx) * 2; // YUYV 是 2 通道
-    yuyv422[yuyv_index] = y;
-    if (idx % 2 == 0)
-    {
-        yuyv422[yuyv_index + 1] = u + 128; // 只给偶数索引像素赋值 U
-    }
-    else
-    {
-        yuyv422[yuyv_index + 1] = v + 128; // 只给奇数索引像素赋值 V
+        yuyv422[index_yuyv] = y0;
+        yuyv422[index_yuyv + 1] = u;
+        yuyv422[index_yuyv + 2] = y1;
+        yuyv422[index_yuyv + 3] = v;
     }
 }
 
-// 主函数调用 CUDA 核心
-void convert_rgb24_to_yuyv_gpu(const uint8_t *rgb24, uint8_t *yuyv422, int width, int height)
-{
-    uint8_t *d_rgb24, *d_yuyv422;
-    int rgb_size = width * height * 3;
-    int yuyv_size = width * height * 2;
+void convert_rgb24_to_yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, int width, int height) {
+    unsigned char *d_rgb24, *d_yuyv422;
+    size_t size_rgb24 = width * height * 3 * sizeof(unsigned char);
+    size_t size_yuyv422 = width * height * 2 * sizeof(unsigned char);
 
-    // 分配 GPU 内存
-    cudaMalloc((void **)&d_rgb24, rgb_size);
-    cudaMalloc((void **)&d_yuyv422, yuyv_size);
+    cudaMalloc((void **)&d_rgb24, size_rgb24);
+    cudaMalloc((void **)&d_yuyv422, size_yuyv422);
+    cudaMemcpy(d_rgb24, rgb24, size_rgb24, cudaMemcpyHostToDevice);
 
-    // 复制数据到 GPU
-    cudaMemcpy(d_rgb24, rgb24, rgb_size, cudaMemcpyHostToDevice);
-
-    // 定义 CUDA 线程块大小（16x16）
     dim3 blockSize(16, 16);
-    dim3 gridSize((width + 15) / 16, (height + 15) / 16);
+    dim3 gridSize((width / 2 + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
 
-    // 启动 CUDA 核心
-    convert_rgb24_to_yuyv_cuda(d_rgb24, d_yuyv422, width, height);
-    cudaDeviceSynchronize(); // 同步 GPU 计算
+    convert_rgb24_to_yuyv_cuda_kernel<<<gridSize, blockSize>>>(d_rgb24, d_yuyv422, width, height);
+    cudaMemcpy(yuyv422, d_yuyv422, size_yuyv422, cudaMemcpyDeviceToHost);
 
-    // 复制结果回 CPU
-    cudaMemcpy(yuyv422, d_yuyv422, yuyv_size, cudaMemcpyDeviceToHost);
-
-    // 释放 GPU 内存
     cudaFree(d_rgb24);
     cudaFree(d_yuyv422);
 }

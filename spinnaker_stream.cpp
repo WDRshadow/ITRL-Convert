@@ -5,8 +5,7 @@
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
 
-#include "convert_rgb24_to_yuyv.h"
-// #include "spinnaker_stream.h"
+#include "convert_rgb24_to_yuyv_cuda.h"
 
 extern "C"
 {
@@ -142,8 +141,7 @@ extern "C"
             unsigned char *yuyv422 = new unsigned char[width * height * 2];
 
             // Convert RGB24 to YUYV422
-            // convert_rgb24_to_yuyv_gpu(imageData, yuyv422, width, height);
-            convert_rgb24_to_yuyv(imageData, yuyv422, width, height);
+            convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
             std::cout << "Converted RGB8 to YUYV422" << std::endl;
 
             // Configure the virtual video device for YUYV422
