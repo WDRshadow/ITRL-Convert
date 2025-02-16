@@ -111,12 +111,13 @@ extern "C"
         // Start capturing images
         camera->BeginAcquisition();
 
-        // Allocate memory for YUYV422 data
-        unsigned char *yuyv422 = nullptr;
+        // CPU time storage
+        std::vector<double> cpu_times_to_rgb24;
+        std::vector<double> cpu_times_to_yuyv422;
 
         // Capture 100 frames for testing
         int count = 0;
-        while (count < 100)
+        while (count < 1000)
         {
             Spinnaker::ImagePtr pImage = camera->GetNextImage();
             if (pImage->IsIncomplete())
@@ -133,51 +134,36 @@ extern "C"
             {
                 const char *pixelFormatName = pixel_format_to_string(pixelFormat);
                 std::cout << "Captured pixel format: " << pixelFormatName << std::endl;
-                std::cout << "Raw pixel format value: " << pixelFormat << std::endl; // Print raw value
+                std::cout << "Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
                 pixel_format_printed = true;
             }
 
             unsigned char *imageData = nullptr;
             unsigned int width = pImage->GetWidth();
             unsigned int height = pImage->GetHeight();
-
-            // CPU time to convert BayerRG8 to RGB8
-            auto start = std::chrono::high_resolution_clock::now();
+            static unsigned char *yuyv422 = new unsigned char[width * height * 2];
 
             // Handle BayerRG8 format: Convert BayerRG8 to RGB8
             if (pixelFormat == Spinnaker::PixelFormatEnums::PixelFormat_BayerRG8)
             {
+                auto start = std::chrono::high_resolution_clock::now(); // Start timer
                 Spinnaker::ImagePtr convertedImage = pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8);
+                auto end = std::chrono::high_resolution_clock::now(); // End timer
+                std::chrono::duration<double> elapsed = end - start;
+                cpu_times_to_rgb24.push_back(elapsed.count() * 1000);
                 imageData = static_cast<unsigned char *>(convertedImage->GetData());
-                std::cout << "Converted BayerRG8 to RGB8" << std::endl;
             }
             else
             {
                 imageData = static_cast<unsigned char *>(pImage->GetData());
             }
 
-            // CPU time to convert BayerRG8 to RGB8 in milliseconds
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed = end - start;
-            std::cout << "Conversion time: " << elapsed.count() * 1000 << " ms" << std::endl;
-
-            // CPU time to convert RGB24 to YUYV422
-            auto start1 = std::chrono::high_resolution_clock::now();
-
-            // Allocate memory for YUYV422 data
-            if (yuyv422 == nullptr)
-            {
-                yuyv422 = new unsigned char[width * height * 2];
-            }
-
             // Convert RGB24 to YUYV422
+            auto start1 = std::chrono::high_resolution_clock::now(); // Start timer
             convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
-            std::cout << "Converted RGB24 to YUYV422" << std::endl;
-
-            // CPU time to convert RGB24 to YUYV422 in milliseconds
-            auto end1 = std::chrono::high_resolution_clock::now();
+            auto end1 = std::chrono::high_resolution_clock::now(); // End timer
             std::chrono::duration<double> elapsed1 = end1 - start1;
-            std::cout << "Conversion time: " << elapsed1.count() * 1000 << " ms" << std::endl;
+            cpu_times_to_yuyv422.push_back(elapsed1.count() * 1000);
 
             // Configure the virtual video device for YUYV422
             if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_YUYV) != 0)
@@ -198,7 +184,19 @@ extern "C"
             count++;
         }
 
-        delete[] yuyv422;
+        // Print CPU mean times
+        double cpu_time_to_rgb24_mean = 0.0;
+        double cpu_time_to_yuyv422_mean = 0.0;
+        for (size_t i = 0; i < cpu_times_to_rgb24.size(); i++)
+        {
+            cpu_time_to_rgb24_mean += cpu_times_to_rgb24[i];
+            cpu_time_to_yuyv422_mean += cpu_times_to_yuyv422[i];
+        }
+        cpu_time_to_rgb24_mean /= cpu_times_to_rgb24.size();
+        cpu_time_to_yuyv422_mean /= cpu_times_to_yuyv422.size();
+        std::cout << "CPU time to convert BayerRG8 to RGB8 (mean): " << cpu_time_to_rgb24_mean << " ms" << std::endl;
+        std::cout << "CPU time to convert RGB24 to YUYV422 (mean): " << cpu_time_to_yuyv422_mean << " ms" << std::endl;
+
         cleanup_cuda_buffers();
         camera->EndAcquisition();
         camera->DeInit();
