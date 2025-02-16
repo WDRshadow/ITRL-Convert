@@ -5,7 +5,8 @@
 extern "C" {
 #endif
 
-void convert_rgb24_to_yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, int width, int height);
+void convert_rgb24_to_yuyv_cuda(const unsigned char* rgb24, unsigned char* yuyv422, unsigned int width,
+                                unsigned int height);
 void cleanup_cuda_buffers();
 
 #ifdef __cplusplus

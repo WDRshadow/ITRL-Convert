@@ -50,43 +50,38 @@ inline void convert_rgb24_to_yuyv_neon(const unsigned char* rgb24, unsigned char
 {
     const unsigned int total_pixels = width * height;
     unsigned int index_yuyv = 0;
-    unsigned int num_iter = total_pixels / 8; // 每次处理 8 个像素
+    unsigned int num_iter = total_pixels / 8;
 
     for (unsigned int i = 0; i < num_iter; i++)
     {
-        // 加载 8 个像素（24 字节），反交错得到 R、G、B 三个通道
         uint8x8x3_t rgb = vld3_u8(rgb24);
         rgb24 += 24;
 
-        // ----- Y 分量计算（使用无符号运算） -----
         uint16x8_t r16_u = vmovl_u8(rgb.val[0]);
         uint16x8_t g16_u = vmovl_u8(rgb.val[1]);
         uint16x8_t b16_u = vmovl_u8(rgb.val[2]);
 
         uint32x4_t y_low = vaddq_u32(
-            vaddq_u32(vmull_n_u16(vget_low_u16(r16_u), (uint16_t)Y_R),
-                      vmull_n_u16(vget_low_u16(g16_u), (uint16_t)Y_G)),
-            vmull_n_u16(vget_low_u16(b16_u), (uint16_t)Y_B));
+            vaddq_u32(vmull_n_u16(vget_low_u16(r16_u), Y_R),
+                      vmull_n_u16(vget_low_u16(g16_u), Y_G)),
+            vmull_n_u16(vget_low_u16(b16_u), Y_B));
         uint32x4_t y_high = vaddq_u32(
-            vaddq_u32(vmull_n_u16(vget_high_u16(r16_u), (uint16_t)Y_R),
-                      vmull_n_u16(vget_high_u16(g16_u), (uint16_t)Y_G)),
-            vmull_n_u16(vget_high_u16(b16_u), (uint16_t)Y_B));
+            vaddq_u32(vmull_n_u16(vget_high_u16(r16_u), Y_R),
+                      vmull_n_u16(vget_high_u16(g16_u), Y_G)),
+            vmull_n_u16(vget_high_u16(b16_u), Y_B));
         uint16x4_t y_low_u16 = vshrn_n_u32(y_low, 16);
         uint16x4_t y_high_u16 = vshrn_n_u32(y_high, 16);
         uint16x8_t y_u16 = vcombine_u16(y_low_u16, y_high_u16);
         uint8x8_t y_u8 = vmovn_u16(y_u16);
 
-        // ----- U/V 分量计算（使用有符号运算） -----
-        // 将无符号扩展数据转换为有符号
         int16x8_t r16 = vreinterpretq_s16_u16(r16_u);
         int16x8_t g16 = vreinterpretq_s16_u16(g16_u);
         int16x8_t b16 = vreinterpretq_s16_u16(b16_u);
 
-        // 将 NEON 寄存器存入上下文中的临时数组
         vst1q_s16(ctx.r_arr, r16);
         vst1q_s16(ctx.g_arr, g16);
         vst1q_s16(ctx.b_arr, b16);
-        // 从上下文数组中提取偶数位置（0,2,4,6）的数据
+
         int16_t r_even_arr[4] = {ctx.r_arr[0], ctx.r_arr[2], ctx.r_arr[4], ctx.r_arr[6]};
         int16_t g_even_arr[4] = {ctx.g_arr[0], ctx.g_arr[2], ctx.g_arr[4], ctx.g_arr[6]};
         int16_t b_even_arr[4] = {ctx.b_arr[0], ctx.b_arr[2], ctx.b_arr[4], ctx.b_arr[6]};
@@ -116,23 +111,20 @@ inline void convert_rgb24_to_yuyv_neon(const unsigned char* rgb24, unsigned char
         uint16x4_t v_u16 = vqmovun_s32(v_val);
         uint8x8_t v_u8 = vmovn_u16(vcombine_u16(v_u16, v_u16));
 
-        // 将转换结果存入上下文临时数组（避免用 vget_lane 的循环调用）
         vst1_u8(ctx.y_temp, y_u8);
         vst1_u8(ctx.u_temp, u_u8);
         vst1_u8(ctx.v_temp, v_u8);
 
-        // 组装输出：每对像素 4 字节，格式为 Y0, U, Y1, V
         for (int j = 0; j < 4; j++)
         {
-            yuyv422[index_yuyv + 4 * j + 0] = ctx.y_temp[2 * j]; // 偶数像素的 Y
-            yuyv422[index_yuyv + 4 * j + 1] = ctx.u_temp[j]; // U 分量
-            yuyv422[index_yuyv + 4 * j + 2] = ctx.y_temp[2 * j + 1]; // 奇数像素的 Y
-            yuyv422[index_yuyv + 4 * j + 3] = ctx.v_temp[j]; // V 分量
+            yuyv422[index_yuyv + 4 * j + 0] = ctx.y_temp[2 * j];
+            yuyv422[index_yuyv + 4 * j + 1] = ctx.u_temp[j];
+            yuyv422[index_yuyv + 4 * j + 2] = ctx.y_temp[2 * j + 1];
+            yuyv422[index_yuyv + 4 * j + 3] = ctx.v_temp[j];
         }
         index_yuyv += 16;
     }
 
-    // 对于剩余不足 8 个像素的部分，使用标量代码处理
     unsigned int remaining = total_pixels % 8;
     for (int i = 0; i < remaining; i += 2)
     {
