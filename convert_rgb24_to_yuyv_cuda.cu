@@ -17,7 +17,7 @@
 
 #define CLAMP(x) (x < 0 ? 0 : (x > 255 ? 255 : x))
 
-__global__ void convert_rgb24_to_yuyv_cuda_kernel(const unsigned char *rgb24, unsigned char *yuyv422, int width, int height)
+__global__ void convert_rgb24_to_yuyv_cuda_kernel(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height)
 {
     int x = (blockIdx.x * blockDim.x + threadIdx.x) * 2;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -46,7 +46,7 @@ __global__ void convert_rgb24_to_yuyv_cuda_kernel(const unsigned char *rgb24, un
     }
 }
 
-void convert_rgb24_to_yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, int width, int height)
+void convert_rgb24_to_yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height)
 {
     static unsigned char *d_rgb24 = nullptr;
     static unsigned char *d_yuyv422 = nullptr;
