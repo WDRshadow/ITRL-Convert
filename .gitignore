@@ -3,3 +3,4 @@ spinnaker_stream.o
 convert_rgb24_to_yuyv_cuda.o
 libspinnaker_stream.a
 spinnaker_stream
+test
