@@ -1,7 +1,7 @@
 #include <iostream>
 #include <chrono>
-#include <algorithm>
 
+#include "convert_rgb24_to_yuyv_cuda.h"
 #include "convert_rgb24_to_yuyv_parallel.h"
 
 extern "C"
@@ -11,13 +11,15 @@ extern "C"
         unsigned int width = 3072;
         unsigned int height = 2048;
         auto *imageData = new unsigned char[width * height * 3];
-        auto *yuyv422 = new unsigned char[width * height * 2];
+        auto *yuyv4221 = new unsigned char[width * height * 2];
+        auto *yuyv4222 = new unsigned char[width * height * 2];
 
         // Store the time of each conversion
         std::vector<double> cpu_times1;
+        std::vector<double> cpu_times2;
 
         // Apply for thread pool
-        ThreadPool thread_pool{8, width, height / 2};
+        ThreadPool thread_pool{4, width, height};
 
         for (int i = 0; i < 100; i++)
         {
@@ -27,22 +29,30 @@ extern "C"
                 imageData[j] = rand() % 256;
             }
 
-            // with cuda and parallel cpu
+            // palallel
             auto start1 = std::chrono::high_resolution_clock::now();
-            thread_pool.convert_task(imageData, yuyv422);
-            // merge imageData_cuda and imageData_parallel into imageData
+            thread_pool.convert_task(imageData, yuyv4221);
             auto end1 = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed1 = end1 - start1;
             cpu_times1.push_back(elapsed1.count() * 1000);
 
+            // cuda
+            auto start2 = std::chrono::high_resolution_clock::now();
+            convert_rgb24_to_yuyv_cuda(imageData, yuyv4222, width, height);
+            auto end2 = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed2 = end2 - start2;
+            cpu_times2.push_back(elapsed2.count() * 1000);
         }
 
         // print the average time
         double sum1 = 0;
+        double sum2 = 0;
         for (int i = 0; i < 100; i++)
         {
             sum1 += cpu_times1[i];
+            sum2 += cpu_times2[i];
         }
-        std::cout << "Average time: " << sum1 / 100 << " ms" << std::endl;
+        std::cout << "Palallel Average time: " << sum1 / 100 << " ms" << std::endl;
+        std::cout << "Cuda Average time: " << sum2 / 100 << " ms" << std::endl;
     }
 }

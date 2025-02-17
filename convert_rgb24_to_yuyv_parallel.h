@@ -8,7 +8,6 @@
 #include <thread>
 
 #include "convert_rgb24_to_yuyv.h"
-#include "convert_rgb24_to_yuyv_cuda.h"
 
 class ThreadPool
 {
@@ -27,7 +26,7 @@ public:
 
 inline ThreadPool::ThreadPool(const unsigned int thread_num, const unsigned int width, const unsigned int height):
     width(width),
-    height(height), pixel_per_height(height / thread_num / 2), thread_num(thread_num),
+    height(height), pixel_per_height(height / thread_num), thread_num(thread_num),
     pixel_per_worker(width * pixel_per_height)
 {
     for (unsigned int i = 0; i < thread_num; i++)
