@@ -7,7 +7,7 @@
 #include <chrono>
 
 #include "convert_rgb24_to_yuyv_cuda.h"
-// #include "ThreadPool.h"
+#include "convert_rgb24_to_yuyv_parallel.h"
 
 extern "C"
 {
@@ -142,8 +142,12 @@ extern "C"
             unsigned char *imageData = nullptr;
             unsigned int width = pImage->GetWidth();
             unsigned int height = pImage->GetHeight();
-            // static ThreadPool pool(8, width, height);
-            static unsigned char *yuyv422 = new unsigned char[width * height * 2];
+            static ThreadPool pool(8, width, height / 2);
+            static auto *yuyv422 = new unsigned char[width * height * 2];
+            static auto *imageData_cuda = new unsigned char[width * height * 3 / 2];
+            static auto *imageData_parallel = new unsigned char[width * height * 3 / 2];
+            static auto *yuyv422_cuda = new unsigned char[width * height];
+            static auto *yuyv422_parallel = new unsigned char[width * height];
 
             // Handle BayerRG8 format: Convert BayerRG8 to RGB8
             if (pixelFormat == Spinnaker::PixelFormatEnums::PixelFormat_BayerRG8)
@@ -160,13 +164,20 @@ extern "C"
                 imageData = static_cast<unsigned char *>(pImage->GetData());
             }
 
+            std::copy(imageData, imageData + width * height * 3 / 2, imageData_cuda);
+            std::copy(imageData + width * height * 3 / 2, imageData + width * height * 3, imageData_parallel);
+
             // Convert RGB24 to YUYV422
             auto start1 = std::chrono::high_resolution_clock::now(); // Start timer
-            convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
-            // pool.convert_task(imageData, yuyv422);
+            std::thread t_cuda(convert_rgb24_to_yuyv_cuda, imageData_cuda, yuyv422_cuda, width, height / 2);
+            pool.convert_task(imageData_parallel, yuyv422_parallel);
+            t_cuda.join();
             auto end1 = std::chrono::high_resolution_clock::now(); // End timer
             std::chrono::duration<double> elapsed1 = end1 - start1;
             cpu_times_to_yuyv422.push_back(elapsed1.count() * 1000);
+
+            std::copy(yuyv422_cuda, yuyv422_cuda + width * height, imageData);
+            std::copy(yuyv422_parallel, yuyv422_parallel + width * height, imageData + width * height);
 
             // Configure the virtual video device for YUYV422
             if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_YUYV) != 0)
@@ -200,7 +211,7 @@ extern "C"
         std::cout << "CPU time to convert BayerRG8 to RGB8 (mean): " << cpu_time_to_rgb24_mean << " ms" << std::endl;
         std::cout << "CPU time to convert RGB24 to YUYV422 (mean): " << cpu_time_to_yuyv422_mean << " ms" << std::endl;
 
-        cleanup_cuda_buffers();
+        // cleanup_cuda_buffers();
         camera->EndAcquisition();
         camera->DeInit();
         camList.Clear();

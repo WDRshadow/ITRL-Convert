@@ -2,12 +2,13 @@
 // Created by Yunhao Xu on 25-2-17.
 //
 
-#ifndef THREADPOOL_H
-#define THREADPOOL_H
+#ifndef CONVERT_RGB24_TO_YUYV_PARALLEL_H
+#define CONVERT_RGB24_TO_YUYV_PARALLEL_H
 #include <vector>
 #include <thread>
 
 #include "convert_rgb24_to_yuyv.h"
+#include "convert_rgb24_to_yuyv_cuda.h"
 
 class ThreadPool
 {
@@ -26,7 +27,7 @@ public:
 
 inline ThreadPool::ThreadPool(const unsigned int thread_num, const unsigned int width, const unsigned int height):
     width(width),
-    height(height), pixel_per_height(height / thread_num), thread_num(thread_num),
+    height(height), pixel_per_height(height / thread_num / 2), thread_num(thread_num),
     pixel_per_worker(width * pixel_per_height)
 {
     for (unsigned int i = 0; i < thread_num; i++)
@@ -41,6 +42,7 @@ inline void ThreadPool::convert_task(const unsigned char* rgb24, unsigned char* 
     {
         workers.emplace_back(convert_rgb24_to_yuyv_core, rgb24, starting_node[i], yuyv422, width, pixel_per_height);
     }
+    
     for (std::thread &worker : workers)
     {
         worker.join();
@@ -48,4 +50,4 @@ inline void ThreadPool::convert_task(const unsigned char* rgb24, unsigned char* 
     workers.clear();
 }
 
-#endif //THREADPOOL_H
+#endif //CONVERT_RGB24_TO_YUYV_PARALLEL_H
