@@ -7,6 +7,7 @@
 #include <chrono>
 
 #include "convert_rgb24_to_yuyv_cuda.h"
+// #include "ThreadPool.h"
 
 extern "C"
 {
@@ -141,6 +142,7 @@ extern "C"
             unsigned char *imageData = nullptr;
             unsigned int width = pImage->GetWidth();
             unsigned int height = pImage->GetHeight();
+            // static ThreadPool pool(8, width, height);
             static unsigned char *yuyv422 = new unsigned char[width * height * 2];
 
             // Handle BayerRG8 format: Convert BayerRG8 to RGB8
@@ -161,6 +163,7 @@ extern "C"
             // Convert RGB24 to YUYV422
             auto start1 = std::chrono::high_resolution_clock::now(); // Start timer
             convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
+            // pool.convert_task(imageData, yuyv422);
             auto end1 = std::chrono::high_resolution_clock::now(); // End timer
             std::chrono::duration<double> elapsed1 = end1 - start1;
             cpu_times_to_yuyv422.push_back(elapsed1.count() * 1000);
