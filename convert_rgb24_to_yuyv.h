@@ -13,24 +13,10 @@
 
 #define CLAMP(x) (x < 0 ? 0 : (x > 255 ? 255 : x))
 
-/**
- * Convert RGB24 to YUYV422. Using the following formulas:
- * 
- * Y = 0.299R + 0.587G + 0.114B
- * U = -0.14713R - 0.28886G + 0.436B
- * V = 0.615R - 0.51499G - 0.10001B
- * 
- * Fixed-point arithmetic optimization is used to speed up the calculation.
- * 
- * @param rgb24 RGB24 data
- * @param yuyv422 YUYV422 data (output)
- * @param width Image width
- * @param height Image height
- */
-inline void convert_rgb24_to_yuyv(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height)
+inline void convert_rgb24_to_yuyv_core(const unsigned char *rgb24, unsigned int starting_node, unsigned char *yuyv422, unsigned int width, unsigned int height)
 {
-    int index_rgb = 0;
-    int index_yuyv = 0;
+    unsigned int index_rgb = starting_node * 3;
+    unsigned int index_yuyv = starting_node * 2;
 
     for (int y = 0; y < height; y++)
     {
@@ -58,4 +44,23 @@ inline void convert_rgb24_to_yuyv(const unsigned char *rgb24, unsigned char *yuy
             index_yuyv += 4;
         }
     }
+}
+
+/**
+ * Convert RGB24 to YUYV422. Using the following formulas:
+ *
+ * 1. Y = 0.299R + 0.587G + 0.114B
+ * 2. U = -0.14713R - 0.28886G + 0.436B
+ * 3. V = 0.615R - 0.51499G - 0.10001B
+ *
+ * Fixed-point arithmetic optimization is used to speed up the calculation.
+ *
+ * @param rgb24 RGB24 data
+ * @param yuyv422 YUYV422 data (output)
+ * @param width Image width
+ * @param height Image height
+ */
+inline void convert_rgb24_to_yuyv(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height)
+{
+    convert_rgb24_to_yuyv_core(rgb24, 0, yuyv422, width, height);
 }
