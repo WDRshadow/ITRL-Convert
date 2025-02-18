@@ -44,21 +44,21 @@ The test result of time taken to process one image (average) is as follows (run 
 
     Note: The test device is NVIDIA Jetson AGX Xavier (32G).
 
-| Processing Type | Time (ms) | CPU clock time (ms) |
-|-----------------|-----------|---------------------|
-| Sequential      | 59.0      | 58.8                |
-| Parallel        | 9.2       | 46.7                |
-| CUDA            | 10.0      | 6.3                 |
+| Processing Type | Time (ms) |
+|-----------------|-----------|
+| Sequential      | 59.0      |
+| Parallel        | 10.9      |
+| CUDA            | 17.1      |
 
 For other devices, just for reference, the test result is shown below:
 
     Note: The test device is AMD 5800X (8vCPU) with RTX4070.
 
-| Processing Type | Time (ms) | CPU clock time (ms) |
-|-----------------|-----------|---------------------|
-| Sequential      | 77.8      | 76.2                |
-| Parallel        | 17.2      | 110.2               |
-| CUDA            | 4.4       | 4.2                 |
+| Processing Type | Time (ms) |
+|-----------------|-----------|
+| Sequential      | 77.8      |
+| Parallel        | 17.2      |
+| CUDA            | 4.2       |
 
 ## RGB24 to YUYV422 FleetMQ streaming test
 
@@ -74,10 +74,10 @@ The conversion is implemented using sequential processing, parallel processing, 
 
     Note: The test device is NVIDIA Jetson AGX Xavier (32G).
 
-|  Processing Type  | Time (ms) | CPU clock time (ms) |
-|-------------------|-----------|---------------------|
-| Bayer to RGB only | 16.8      | 17.3                |
-| Sequential        | 47.6      | 53.6                |
-| Parallel          | 16.8      | 50.5                |
-| CUDA              | 16.8      | 19.3                |
+|  Processing Type  | Time (ms) |
+|-------------------|-----------|
+| Bayer to RGB only | 16.8      |
+| Sequential        | 47.6      |
+| Parallel          | 16.8      |
+| CUDA              | 16.8      |
 
