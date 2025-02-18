@@ -62,6 +62,8 @@ For other devices, just for reference, the test result is shown below:
 
 ## RGB24 to YUYV422 FleetMQ streaming test
 
+    Note: Please change to dev branch before running the test below.
+
 The code has been implemented. You can directly run the test by following the previous steps and running the following command:
 ```bash
 ./build.sh && sudo ./spinnaker_stream

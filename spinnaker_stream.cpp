@@ -6,8 +6,6 @@
 #include <linux/videodev2.h>
 #include <chrono>
 
-// #include "convert_rgb24_to_yuyv.h"
-// #include "convert_rgb24_to_yuyv_parallel.h"
 #include "convert_rgb24_to_yuyv_cuda.h"
 
 extern "C"
@@ -113,15 +111,8 @@ extern "C"
         // Start capturing images
         camera->BeginAcquisition();
 
-        // CPU time storage
-        std::vector<double> cpu_times;
-
-        // Capture 100 frames for testing
-        int count = 0;
-        while (count < 1000)
+        while (true)
         {
-            auto start1 = std::chrono::high_resolution_clock::now(); // Start timer
-
             static Spinnaker::ImagePtr pImage = nullptr;
             static unsigned char *imageData = nullptr;
 
@@ -141,6 +132,7 @@ extern "C"
             {
                 std::cout << "Captured pixel format: " << pixel_format_to_string(pImage->GetPixelFormat()) << std::endl;
                 std::cout << "Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
+                std::cout << "Converting to YUYV422 format..." << std::endl;
                 pixel_format_printed = true;
             }
 
@@ -149,16 +141,12 @@ extern "C"
 
             // Convert RGB24 to YUYV422
             static auto *yuyv422 = new unsigned char[width * height * 2];
-            // convert_rgb24_to_yuyv(imageData, yuyv422, width, height);
-            // static ThreadPool pool(8, width, height);
-            // pool.convert_task(imageData, yuyv422);
             convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
 
             // Configure the virtual video device for YUYV422
             bool is_configured = false;
             if (!is_configured)
             {
-                // if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_RGB24) != 0)
                 if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_YUYV) != 0)
                 {
                     std::cerr << "Failed to configure virtual device" << std::endl;
@@ -168,7 +156,6 @@ extern "C"
             }
 
             // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
-            // if (write(video_fd, imageData, width * height * 2) == -1)
             if (write(video_fd, yuyv422, width * height * 2) == -1)
             {
                 std::cerr << "Error writing frame to virtual device" << std::endl;
@@ -176,22 +163,7 @@ extern "C"
             }
 
             pImage->Release();
-
-            auto end1 = std::chrono::high_resolution_clock::now(); // End timer
-            std::chrono::duration<double> elapsed1 = end1 - start1;
-            cpu_times.push_back(elapsed1.count() * 1000); // Store the time in milliseconds
-
-            count++;
         }
-
-        // Print CPU mean times
-        double cpu_time_mean = 0.0;
-        for (size_t i = 0; i < cpu_times.size(); i++)
-        {
-            cpu_time_mean += cpu_times[i];
-        }
-        cpu_time_mean /= cpu_times.size();
-        std::cout << "CPU mean time: " << cpu_time_mean << " ms" << std::endl;
 
         cleanup_cuda_buffers();
         camera->EndAcquisition();
