@@ -6,6 +6,8 @@
 #include <linux/videodev2.h>
 #include <chrono>
 
+// #include "convert_rgb24_to_yuyv.h"
+// #include "convert_rgb24_to_yuyv_parallel.h"
 #include "convert_rgb24_to_yuyv_cuda.h"
 
 extern "C"
@@ -120,52 +122,53 @@ extern "C"
         {
             auto start1 = std::chrono::high_resolution_clock::now(); // Start timer
 
-            Spinnaker::ImagePtr pImage = camera->GetNextImage();
+            static Spinnaker::ImagePtr pImage = nullptr;
+            static unsigned char *imageData = nullptr;
+
+            pImage = camera->GetNextImage();
+
+            static unsigned int width = pImage->GetWidth();
+            static unsigned int height = pImage->GetHeight();
+            static auto *yuyv422 = new unsigned char[width * height * 2];
+
             if (pImage->IsIncomplete())
             {
                 std::cerr << "Image incomplete: " << pImage->GetImageStatus() << std::endl;
                 continue;
             }
 
-            // Get pixel format directly from the ImagePtr object
-            Spinnaker::PixelFormatEnums pixelFormat = pImage->GetPixelFormat();
-
             // Print the pixel format only once
             if (!pixel_format_printed)
             {
-                const char *pixelFormatName = pixel_format_to_string(pixelFormat);
-                std::cout << "Captured pixel format: " << pixelFormatName << std::endl;
+                std::cout << "Captured pixel format: " << pixel_format_to_string(pImage->GetPixelFormat()) << std::endl;
                 std::cout << "Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
                 pixel_format_printed = true;
             }
 
-            static unsigned char *imageData = nullptr;
-            static unsigned int width = pImage->GetWidth();
-            static unsigned int height = pImage->GetHeight();
-            static auto *yuyv422 = new unsigned char[width * height * 2];
-
             // Handle BayerRG8 format: Convert BayerRG8 to RGB8
-            if (pixelFormat == Spinnaker::PixelFormatEnums::PixelFormat_BayerRG8)
-            {
-                Spinnaker::ImagePtr convertedImage = pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8);
-                imageData = static_cast<unsigned char *>(convertedImage->GetData());
-            }
-            else
-            {
-                imageData = static_cast<unsigned char *>(pImage->GetData());
-            }
+            imageData = static_cast<unsigned char *>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->GetData());
 
             // Convert RGB24 to YUYV422
+            // convert_rgb24_to_yuyv(imageData, yuyv422, width, height);
+            // ThreadPool pool(8, width, height);
+            // pool.convert_task(imageData, yuyv422);
             convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
 
             // Configure the virtual video device for YUYV422
-            if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_YUYV) != 0)
+            bool is_configured = false;
+            if (!is_configured)
             {
-                std::cerr << "Failed to configure virtual device" << std::endl;
-                break;
+                // if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_RGB24) != 0)
+                if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_YUYV) != 0)
+                {
+                    std::cerr << "Failed to configure virtual device" << std::endl;
+                    break;
+                }
+                is_configured = true;
             }
 
             // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
+            // if (write(video_fd, imageData, width * height * 2) == -1)
             if (write(video_fd, yuyv422, width * height * 2) == -1)
             {
                 std::cerr << "Error writing frame to virtual device" << std::endl;
@@ -190,8 +193,6 @@ extern "C"
         cpu_time_mean /= cpu_times.size();
         std::cout << "CPU mean time: " << cpu_time_mean << " ms" << std::endl;
 
-
-        // cleanup_cuda_buffers();
         cleanup_cuda_buffers();
         camera->EndAcquisition();
         camera->DeInit();
