@@ -129,7 +129,6 @@ extern "C"
 
             static unsigned int width = pImage->GetWidth();
             static unsigned int height = pImage->GetHeight();
-            static auto *yuyv422 = new unsigned char[width * height * 2];
 
             if (pImage->IsIncomplete())
             {
@@ -149,8 +148,9 @@ extern "C"
             imageData = static_cast<unsigned char *>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->GetData());
 
             // Convert RGB24 to YUYV422
+            static auto *yuyv422 = new unsigned char[width * height * 2];
             // convert_rgb24_to_yuyv(imageData, yuyv422, width, height);
-            // ThreadPool pool(8, width, height);
+            // static ThreadPool pool(8, width, height);
             // pool.convert_task(imageData, yuyv422);
             convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
 
