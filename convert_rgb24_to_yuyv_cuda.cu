@@ -61,7 +61,7 @@ void convert_rgb24_to_yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv4
     cudaMemcpy(d_rgb24, rgb24, size_rgb24, cudaMemcpyHostToDevice);
 
     // This can be changed to a more optimal block size depending on the data size
-    dim3 blockSize(48, 32);
+    dim3 blockSize(32, 16);
     dim3 gridSize((width / 2 + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
 
     convert_rgb24_to_yuyv_cuda_kernel<<<gridSize, blockSize>>>(d_rgb24, d_yuyv422, width, height);
