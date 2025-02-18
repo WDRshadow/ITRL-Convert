@@ -21,7 +21,7 @@ Now the stream is available on `/dev/video16`. If you want to view it, open a ne
 ffplay /dev/video16
 ```
 
-## Optional YUYV422 test
+## Optional YUYV422 test (No longer work)
 The stream created above is in the wrong format for FleetMQ to be able to stream it. To stream it, it needs to be converted into the YUYV422 format. Technically, `ffmpeg` is capable of this, but it adds a huge amount of latency. To see this test and try it's compatibility with FleetMQ, run the following:
 ```
 ffmpeg -f video4linux2 -input_format rgb24 -i /dev/video16 -pix_fmt yuyv422 -f v4l2 /dev/video17
@@ -52,13 +52,13 @@ The test result of time taken to process one image (average) is as follows (run 
 
 For other devices, just for reference, the test result is shown below:
 
-    Note: The test device is AMD 5800X with RTX4070.
+    Note: The test device is AMD 5800X (8vCPU) with RTX4070.
 
 | Processing Type | Time (ms) | CPU clock time (ms) |
 |-----------------|-----------|---------------------|
-| Sequential      | -      | -                |
-| Parallel        | -       | -                |
-| CUDA            | -      | -                 |
+| Sequential      | 77.8      | 76.2                |
+| Parallel        | 17.2      | 110.2               |
+| CUDA            | 4.4       | 4.2                 |
 
 ## RGB24 to YUYV422 FleetMQ streaming test
 
@@ -66,7 +66,7 @@ The code has been implemented. You can directly run the test by following the pr
 ```bash
 ./build.sh && sudo ./spinnaker_stream
 ```
-The code has been changed to capture the 1000 images and convert them to YUYV422 format then directly write to video device '/dev/video16'. A timmer is used to measure the time taken to process one image (all the way from Bayer to YUYB).
+The code has been changed to capture the 1000 images and convert them from Bayer to YUYV format then directly write to video device '/dev/video16'. A timmer is used to measure the time taken to process one image (all the way from Bayer to YUYB).
 
 The conversion is implemented using sequential processing, parallel processing, and CUDA processing. The test result of time taken to process one image (average) is as follows (run three time and take the average):
 
