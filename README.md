@@ -76,8 +76,8 @@ The conversion is implemented using sequential processing, parallel processing, 
 
 |  Processing Type  | Time (ms) |
 |-------------------|-----------|
-| Bayer to RGB only | 16.8      |
+| Bayer to RGB only | 8.7       |
 | Sequential        | 47.6      |
-| Parallel          | 16.8      |
-| CUDA              | 16.8      |
+| Parallel          | 16.0      |
+| CUDA              | 16.0      |
 
