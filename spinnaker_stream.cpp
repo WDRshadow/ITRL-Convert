@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
-#include <chrono>
 
 #include "convert_rgb24_to_yuyv_cuda.h"
 
@@ -30,7 +29,8 @@ extern "C"
             vfmt.fmt.pix.sizeimage = width * height * 2;
             break;
         default:
-            break;
+            std::cerr << "Unsupported pixel format" << std::endl;
+            return -1;
         }
 
         if (ioctl(video_fd, VIDIOC_S_FMT, &vfmt) < 0)
@@ -107,6 +107,7 @@ extern "C"
         camera->Init();
 
         bool pixel_format_printed = false;
+        bool is_configured = false;
 
         // Start capturing images
         camera->BeginAcquisition();
@@ -114,7 +115,6 @@ extern "C"
         while (true)
         {
             static Spinnaker::ImagePtr pImage = nullptr;
-            static unsigned char *imageData = nullptr;
 
             pImage = camera->GetNextImage();
 
@@ -137,6 +137,7 @@ extern "C"
             }
 
             // Handle BayerRG8 format: Convert BayerRG8 to RGB8
+            static unsigned char *imageData = nullptr;
             imageData = static_cast<unsigned char *>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->GetData());
 
             // Convert RGB24 to YUYV422
@@ -144,7 +145,6 @@ extern "C"
             convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
 
             // Configure the virtual video device for YUYV422
-            bool is_configured = false;
             if (!is_configured)
             {
                 if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_YUYV) != 0)

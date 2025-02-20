@@ -1,30 +1,67 @@
 #include <iostream>
-#include <chrono>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <linux/videodev2.h>
 
-#include "convert_rgb24_to_yuyv.h"
 #include "convert_rgb24_to_yuyv_cuda.h"
-#include "convert_rgb24_to_yuyv_parallel.h"
 
 extern "C"
 {
+
+    int configure_video_device(int video_fd, int width, int height, __u32 pixel_format)
+    {
+        struct v4l2_format vfmt = {};
+        vfmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+        vfmt.fmt.pix.width = width;
+        vfmt.fmt.pix.height = height;
+        vfmt.fmt.pix.pixelformat = pixel_format;
+        vfmt.fmt.pix.field = V4L2_FIELD_NONE;
+        switch (pixel_format)
+        {
+        case V4L2_PIX_FMT_RGB24:
+            vfmt.fmt.pix.bytesperline = width * 3;
+            vfmt.fmt.pix.sizeimage = width * height * 3;
+            break;
+        case V4L2_PIX_FMT_YUYV:
+            vfmt.fmt.pix.bytesperline = width * 2;
+            vfmt.fmt.pix.sizeimage = width * height * 2;
+            break;
+        default:
+            std::cerr << "Unsupported pixel format" << std::endl;
+            return -1;
+        }
+
+        if (ioctl(video_fd, VIDIOC_S_FMT, &vfmt) < 0)
+        {
+            std::cerr << "Failed to set video format on virtual device" << std::endl;
+            return -1;
+        }
+
+        return 0;
+    }
+
     int main()
     {
         unsigned int width = 3072;
         unsigned int height = 2048;
         auto *imageData = new unsigned char[width * height * 3];
         auto *yuyv422 = new unsigned char[width * height * 2];
-        auto *yuyv4221 = new unsigned char[width * height * 2];
-        auto *yuyv4222 = new unsigned char[width * height * 2];
 
-        // Store the time of each conversion
-        std::vector<double> cpu_times;
-        std::vector<double> cpu_times1;
-        std::vector<double> cpu_times2;
+        int video_fd = open("/dev/video16", O_WRONLY);
+        if (video_fd == -1)
+        {
+            std::cerr << "Failed to open virtual device" << std::endl;
+            return -1;
+        }
 
-        // Apply for thread pool
-        ThreadPool thread_pool{8, width, height};
+        if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_YUYV) != 0)
+        {
+            std::cerr << "Failed to configure virtual device" << std::endl;
+            return -1;
+        }
 
-        for (int i = 0; i < 100; i++)
+        while (true)
         {
             // Randomly set pixels in imageData
             for (int j = 0; j < width * height * 3; j++)
@@ -32,40 +69,15 @@ extern "C"
                 imageData[j] = rand() % 256;
             }
 
-            // sequential
-            auto start = std::chrono::high_resolution_clock::now();
-            convert_rgb24_to_yuyv(imageData, yuyv422, width, height);
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed = end - start;
-            cpu_times.push_back(elapsed.count() * 1000);
-
-            // palallel
-            auto start1 = std::chrono::high_resolution_clock::now();
-            thread_pool.convert_task(imageData, yuyv4221);
-            auto end1 = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed1 = end1 - start1;
-            cpu_times1.push_back(elapsed1.count() * 1000);
-
             // cuda
-            auto start2 = std::chrono::high_resolution_clock::now();
-            convert_rgb24_to_yuyv_cuda(imageData, yuyv4222, width, height);
-            auto end2 = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed2 = end2 - start2;
-            cpu_times2.push_back(elapsed2.count() * 1000);
-        }
+            convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
 
-        // print the average time
-        double sum = 0;
-        double sum1 = 0;
-        double sum2 = 0;
-        for (int i = 0; i < 100; i++)
-        {
-            sum += cpu_times[i];
-            sum1 += cpu_times1[i];
-            sum2 += cpu_times2[i];
+            // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
+            if (write(video_fd, yuyv422, width * height * 2) == -1)
+            {
+                std::cerr << "Error writing frame to virtual device" << std::endl;
+                break;
+            }
         }
-        std::cout << "Sequential Average time: " << sum / 100 << " ms" << std::endl;
-        std::cout << "Palallel Average time: " << sum1 / 100 << " ms" << std::endl;
-        std::cout << "Cuda Average time: " << sum2 / 100 << " ms" << std::endl;
     }
 }
