@@ -143,9 +143,18 @@ extern "C"
             static unsigned char *imageData = nullptr;
             imageData = static_cast<unsigned char *>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->GetData());
 
+            // add fisheye testing 
+            static const Fisheye camera("fisheye_calibration.yaml");
+            static const Homography homography("homography_calibration.yaml");
+            static const vector<Point2f> line1 = create_line(Point2f(284, 1278), Point2f(248, 426), 300);
+            static const vector<Point2f> line2 = create_line(Point2f(1420, 1278), Point2f(1420, 426), 300);
+            static auto* _img_ = new unsigned char[width * height * 3];
+            draw_points(imageData, _img_, width, height, line1, camera, homography);
+            draw_points(imageData, _img_, width, height, line2, camera, homography);
+
             // Convert RGB24 to YUYV422
             static auto *yuyv422 = new unsigned char[width * height * 2];
-            convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
+            convert_rgb24_to_yuyv_cuda(_img_, yuyv422, width, height);
 
             // Configure the virtual video device for YUYV422
             if (!is_configured)

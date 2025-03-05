@@ -48,9 +48,9 @@ inline void draw_points(const unsigned char *src, unsigned char *sol, int width,
 {
     static vector<Point2f> points_;
     static vector<Point2f> _points_(points.size());
+    static auto img = Mat(Size(width, height), CV_8UC3, (void*)src);
     homography.projectPoints(points, points_);
     fisheye.distortPoints(points_, _points_);
-    static auto img = Mat(Size(width, height), CV_8UC3, (void*)src);
     img += _points_;
     memcpy(sol, img.data, width * height * 3);
 }

@@ -2,7 +2,7 @@ package main
 
 /*
 #cgo CXXFLAGS: -I/usr/include/spinnaker -I/usr/include/opencv4
-#cgo LDFLAGS: -L. -lspinnaker_stream -lSpinnaker -lstdc++ -L/usr/local/cuda/lib64 -lcudart
+#cgo LDFLAGS: -L. -lspinnaker_stream -lSpinnaker -lstdc++ -L/usr/local/cuda/lib64 -lcudart -lm
 #cgo pkg-config: opencv4
 extern void capture_frames(const char* video_device);
 */
