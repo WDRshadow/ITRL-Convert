@@ -6,6 +6,9 @@
 #include <linux/videodev2.h>
 
 #include "convert_rgb24_to_yuyv_cuda.h"
+#include "fisheye.h"
+#include "homography.h"
+#include "util.h"
 
 extern "C"
 {

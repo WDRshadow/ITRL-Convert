@@ -5,3 +5,4 @@ libspinnaker_stream.a
 spinnaker_stream
 test
 CMakeLists.txt
+*.yaml
