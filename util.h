@@ -18,9 +18,9 @@ using namespace cv;
  * @param lhs image
  * @param rhs points
  */
-inline void operator+=(Mat& lhs, const vector<Point2f>& rhs)
+inline void operator+=(Mat &lhs, const vector<Point2f> &rhs)
 {
-    for (const auto& p : rhs)
+    for (const auto &p : rhs)
     {
         circle(lhs, p, 3, Scalar(255, 255, 255), FILLED);
     }
@@ -44,15 +44,15 @@ inline vector<Point2f> create_line(Point2f start, Point2f end, int num)
     return line;
 }
 
-inline void draw_points(const unsigned char *src, unsigned char *sol, int width, int height, const vector<Point2f>& points, const Fisheye& fisheye, const Homography& homography)
+inline void draw_points(const unsigned char *src, unsigned char *sol, int width, int height, const vector<Point2f> &points, const Fisheye &fisheye, const Homography &homography)
 {
     static vector<Point2f> points_;
     static vector<Point2f> _points_(points.size());
-    static auto img = Mat(Size(width, height), CV_8UC3, (void*)src);
+    auto img = Mat(Size(width, height), CV_8UC3, (void *)src);
     homography.projectPoints(points, points_);
     fisheye.distortPoints(points_, _points_);
     img += _points_;
     memcpy(sol, img.data, width * height * 3);
 }
 
-#endif //UTIL_H
+#endif // UTIL_H
