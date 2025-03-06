@@ -6,3 +6,4 @@ spinnaker_stream
 test
 CMakeLists.txt
 *.yaml
+fisheye_test/*

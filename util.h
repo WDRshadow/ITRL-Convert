@@ -13,26 +13,14 @@
 using namespace std;
 using namespace cv;
 
-/**
- * Add the white points to the image.
- * @param lhs image
- * @param rhs points
- */
-inline void operator+=(Mat &lhs, const vector<Point2f> &rhs)
+inline void operator+=(Mat& lhs, const vector<Point2f>& rhs)
 {
-    for (const auto &p : rhs)
+    for (const auto& p : rhs)
     {
         circle(lhs, p, 3, Scalar(255, 255, 255), FILLED);
     }
 }
 
-/**
- * Create a line from start to end.
- * @param start start point
- * @param end end point
- * @param num number of points
- * @return the line
- */
 inline vector<Point2f> create_line(Point2f start, Point2f end, int num)
 {
     vector<Point2f> line;
@@ -44,15 +32,29 @@ inline vector<Point2f> create_line(Point2f start, Point2f end, int num)
     return line;
 }
 
-inline void draw_points(const unsigned char *src, unsigned char *sol, int width, int height, const vector<Point2f> &points, const Fisheye &fisheye, const Homography &homography)
+inline vector<Point2f> create_curve(Point2f start, Point2f control, Point2f end, int num)
+{
+    vector<Point2f> curve;
+    curve.reserve(num);
+    for (int i = 0; i <= num; i++)
+    {
+        float t = static_cast<float>(i) / num;
+        float u = 1 - t;
+        Point2f point = u * u * start + 2 * u * t * control + t * t * end;
+        curve.push_back(point);
+    }
+    return curve;
+}
+
+inline void draw_points(const unsigned char *src, unsigned char *sol, int width, int height, const vector<Point2f>& points, const Fisheye& fisheye, const Homography& homography)
 {
     static vector<Point2f> points_;
     static vector<Point2f> _points_(points.size());
-    auto img = Mat(Size(width, height), CV_8UC3, (void *)src);
+    auto img = Mat(Size(width, height), CV_8UC3, (void*)src);
     homography.projectPoints(points, points_);
     fisheye.distortPoints(points_, _points_);
     img += _points_;
     memcpy(sol, img.data, width * height * 3);
 }
 
-#endif // UTIL_H
+#endif //UTIL_H

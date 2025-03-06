@@ -144,23 +144,27 @@ extern "C"
             imageData = static_cast<unsigned char *>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->GetData());
 
             // add fisheye testing
+            // -----------------------------------------------------------------------------------------------
             static const Fisheye camera("fisheye_calibration.yaml");
             static const Homography homography("homography_calibration.yaml");
             static auto *_img_ = new unsigned char[width * height * 3];
+            static vector<Point2f> lines;
             static float j = 0;
             static bool flag = true;
-            if (j > 500)
+            if (j > 50)
                 flag = false;
-            if (j < -500)
+            if (j < -50)
                 flag = true;
             if (flag)
-                j += 20;
+                j += 1;
             else
-                j -= 20;
-            const vector<Point2f> line1 = create_line(Point2f(284, 1278), Point2f(284 + j, 426), 300);
-            const vector<Point2f> line2 = create_line(Point2f(1420, 1278), Point2f(1420 + j, 426), 300);
-            draw_points(imageData, _img_, width, height, line1, camera, homography);
-            draw_points(imageData, _img_, width, height, line2, camera, homography);
+                j -= 1;
+            const vector<Point2f> line_left = create_curve(Point2f(1511, 2047), Point2f(1511, 1663), Point2f(1511 + j, 1280), 300);
+            const vector<Point2f> line_right = create_curve(Point2f(1561, 2047), Point2f(1561, 1663), Point2f(1561 + j, 1280), 300);
+            lines = line_left;
+            lines.insert(lines.end(), line_right.begin(), line_right.end());
+            draw_points(imageData, _img_, width, height, lines, camera, homography);
+            // -----------------------------------------------------------------------------------------------
 
             // Convert RGB24 to YUYV422
             static auto *yuyv422 = new unsigned char[width * height * 2];
