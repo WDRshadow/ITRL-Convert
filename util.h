@@ -38,7 +38,7 @@ inline vector<Point2f> create_curve(Point2f start, Point2f control, Point2f end,
     curve.reserve(num);
     for (int i = 0; i <= num; i++)
     {
-        float t = static_cast<float>(i) / num;
+        float t = static_cast<float>(i) / static_cast<float>(num);
         float u = 1 - t;
         Point2f point = u * u * start + 2 * u * t * control + t * t * end;
         curve.push_back(point);
