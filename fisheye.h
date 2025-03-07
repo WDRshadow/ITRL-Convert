@@ -77,8 +77,6 @@ inline Fisheye::Fisheye(Size boardSize, float squareSize, const String* filename
         }
     }
 
-    destroyAllWindows();
-
     if (imagePoints.empty())
     {
         cout << "No enough data for criteria." << endl;
