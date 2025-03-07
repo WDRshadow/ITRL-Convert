@@ -1,3 +1,3 @@
 rm test
 
-g++ -I. -o test test.cpp `pkg-config --cflags --libs opencv4`
+g++ -I. -o test test.cpp -lncurses `pkg-config --cflags --libs opencv4`
