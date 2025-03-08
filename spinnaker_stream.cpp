@@ -9,6 +9,7 @@
 #include "fisheye.h"
 #include "homography.h"
 #include "util.h"
+#include "sensor.h"
 
 extern "C"
 {
@@ -143,27 +144,22 @@ extern "C"
             static unsigned char *imageData = nullptr;
             imageData = static_cast<unsigned char *>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->GetData());
 
-            // add fisheye testing
+            // add driver line
             // -----------------------------------------------------------------------------------------------
-            static const Fisheye camera("fisheye_calibration.yaml");
-            static const Homography homography("homography_calibration.yaml");
             static auto *_img_ = new unsigned char[width * height * 3];
-            static vector<Point2f> lines;
-            static float j = 0;
-            static bool flag = true;
-            if (j > 50)
-                flag = false;
-            if (j < -50)
-                flag = true;
-            if (flag)
-                j += 1;
-            else
-                j -= 1;
-            const vector<Point2f> line_left = create_curve(Point2f(1511, 2047), Point2f(1511, 1663), Point2f(1511 + j, 1280), 300);
-            const vector<Point2f> line_right = create_curve(Point2f(1561, 2047), Point2f(1561, 1663), Point2f(1561 + j, 1280), 300);
-            lines = line_left;
+            static const Fisheye fisheye_camera("fisheye_calibration.yaml");
+            static const Homography homography("homography_calibration.yaml");
+            static vector<Point2f> lines_;
+            static vector<Point2f> _lines_(600);
+            static const auto interpolation_51_100 = [](int x) -> int {
+                return (x * 100 + 50) / 51;
+            };
+            const float angle = get_steering_wheel_angle() / 4.1f;
+            const vector<Point2f> line_left = create_curve(Point2f(1511, 2047), Point2f(1511, 1663), Point2f(1511 + 125 * tan(angle), 1280), 300);
+            const vector<Point2f> line_right = create_curve(Point2f(1561, 2047), Point2f(1561, 1663), Point2f(1561 + 125 * tan(angle), 1280), 300);
+            vector<Point2f> lines = line_left;
             lines.insert(lines.end(), line_right.begin(), line_right.end());
-            draw_points(imageData, _img_, width, height, lines, camera, homography);
+            draw_points(imageData, _img_, width, height, lines, fisheye_camera, homography);
             // -----------------------------------------------------------------------------------------------
 
             // Convert RGB24 to YUYV422

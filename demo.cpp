@@ -1,13 +1,14 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <vector>
 #include <cmath>
 
 #include "fisheye.h"
 #include "homography.h"
 #include "util.h"
+#include "demo_global_index.h"
+#include "sensor.h"
 
 using namespace std;
 using namespace cv;
@@ -20,25 +21,6 @@ int main()
         cerr << "Error: cannot open the video file" << endl;
         return -1;
     }
-
-    ifstream file("test/test.csv");
-    if (!file.is_open()) {
-        cerr << "Error: cannot open the file" << endl;
-        return -1;
-    }
-
-    vector<float> angles_100hz;
-    string line;
-    while (getline(file, line)) {
-        stringstream ss(line);
-        string value;
-        if (getline(ss, value, ',')) {
-            value.erase(remove_if(value.begin(), value.end(), [](char c) { return !isdigit(c) && c != '.' && c != '-'; }), value.end());
-            angles_100hz.push_back(stof(value));
-        }
-    }
-
-    file.close();
 
     const Fisheye camera("fisheye_calibration.yaml");
     const Homography homography("homography_calibration.yaml");
@@ -60,11 +42,8 @@ int main()
             break;
         }
         const int index = interpolation_51_100(count);
-        if (index >= angles_100hz.size())
-        {
-            break;
-        }
-        float angle = angles_100hz[start + index] / 4.1f;
+        GLOBAL_INDEX = start + index;
+        float angle = get_steering_wheel_angle() / 4.1f;
         const vector<Point2f> line_left = create_curve(Point2f(1511, 2047), Point2f(1511, 1663), Point2f(1511 + 125 * tan(angle), 1280), 300);
         const vector<Point2f> line_right = create_curve(Point2f(1561, 2047), Point2f(1561, 1663), Point2f(1561 + 125 * tan(angle), 1280), 300);
         vector<Point2f> lines = line_left;
