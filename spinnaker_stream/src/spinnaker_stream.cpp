@@ -140,9 +140,7 @@ extern "C"
 
             // Handle BayerRG8 format: Convert BayerRG8 to RGB8
             static unsigned char *imageData = nullptr;
-            Spinnaker::ImageProcessor processor;
-            Spinnaker::ImagePtr convertedImage = processor.Convert(pImage, Spinnaker::PixelFormatEnums::PixelFormat_RGB8);
-            imageData = static_cast<unsigned char *>(convertedImage->GetData());
+            imageData = static_cast<unsigned char *>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->GetData());
 
             // add driver line
             // -----------------------------------------------------------------------------------------------

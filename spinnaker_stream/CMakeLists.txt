@@ -15,10 +15,10 @@ target_include_directories(spinnaker_stream
         PUBLIC
         include
         ${OpenCV_INCLUDE_DIRS}
+        /usr/include/spinnaker
         ${CMAKE_SOURCE_DIR}/sensor/include
         ${CMAKE_SOURCE_DIR}/rgb2yuyv/include
         ${CMAKE_SOURCE_DIR}/camera/include
-        /opt/spinnaker/include
 )
 
 set_target_properties(spinnaker_stream PROPERTIES
