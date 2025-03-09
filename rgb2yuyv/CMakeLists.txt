@@ -7,7 +7,7 @@ set(CMAKE_CUDA_ARCHITECTURES 72)
 
 add_library(rgb2yuyv
         STATIC
-        src/rbg2yuyv.cu
+        src/rgb2yuyv.cu
 )
 
 target_include_directories(rgb2yuyv
