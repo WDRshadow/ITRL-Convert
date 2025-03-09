@@ -1,4 +1,6 @@
 .vscode/
-*.yaml
-fisheye_test/*
 build/
+test/
+*.yaml
+*.o
+*.a
