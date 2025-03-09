@@ -4,7 +4,6 @@ project(rgb2yuyv LANGUAGES CXX CUDA)
 
 set(CMAKE_CUDA_STANDARD 17)
 
-
 add_library(rgb2yuyv
         STATIC
         src/rbg2yuyv.cu
