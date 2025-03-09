@@ -6,10 +6,6 @@
 
 #include "sensor.h"
 
-#ifdef DEMO
-#include "global_index.h"
-#endif
-
 using namespace std;
 
 SensorBuffer::SensorBuffer(const string& filename)

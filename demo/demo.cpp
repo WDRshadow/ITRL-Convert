@@ -32,7 +32,7 @@ int main()
     const SensorBuffer buffer("test/str_whe_phi.csv");
 
     cap.set(CAP_PROP_POS_FRAMES, 8000);
-    const int start = 15293;
+    constexpr int start = 15293;
     int count = 0;
     while (true)
     {
