@@ -9,6 +9,7 @@ find_package(OpenCV REQUIRED)
 add_library(sensor
         STATIC
         src/sensor.cpp
+        src/sensor_api.cpp
 )
 
 target_include_directories(sensor
