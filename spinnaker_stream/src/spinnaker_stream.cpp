@@ -5,7 +5,8 @@
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
 
-#include "convert_rgb24_to_yuyv_cuda.h"
+#include "spinnaker_stream.h"
+#include "rgb2yuyv.h"
 
 extern "C"
 {
@@ -42,7 +43,6 @@ extern "C"
         return 0;
     }
 
-    // Function to convert Spinnaker PixelFormat to V4L2 format
     __u32 spinnaker_to_v4l2_format(Spinnaker::PixelFormatEnums pixelFormat)
     {
         switch (pixelFormat)
@@ -60,7 +60,6 @@ extern "C"
         }
     }
 
-    // Function to get the pixel format as a string
     const char *pixel_format_to_string(Spinnaker::PixelFormatEnums pixelFormat)
     {
         switch (pixelFormat)
@@ -82,7 +81,6 @@ extern "C"
         }
     }
 
-    // Function to capture frames from the FLIR camera and stream them in supported formats
     void capture_frames(const char *video_device)
     {
         // Open the virtual V4L2 device
