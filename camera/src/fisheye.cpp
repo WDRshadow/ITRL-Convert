@@ -1,29 +1,11 @@
-//
-// Created by Yunhao Xu on 25-2-27.
-//
-
-#ifndef FISHEYE_H
-#define FISHEYE_H
-
 #include <opencv2/opencv.hpp>
+
+#include "fisheye.h"
 
 using namespace std;
 using namespace cv;
 
-class Fisheye
-{
-    Mat K;
-    Mat D;
-
-public:
-    Fisheye(Size boardSize, float squareSize, const String* filename);
-    explicit Fisheye(const String& filename);
-    void save(const String& filename) const;
-    void undistort(const Mat& src, Mat& sol) const;
-    void distortPoints(const vector<Point2f>& src, vector<Point2f>& sol) const;
-};
-
-inline Fisheye::Fisheye(Size boardSize, float squareSize, const String* filename)
+Fisheye::Fisheye(Size boardSize, float squareSize, const String* filename)
 {
     vector<string> imageFiles;
     glob(*filename, imageFiles);
@@ -101,7 +83,7 @@ inline Fisheye::Fisheye(Size boardSize, float squareSize, const String* filename
     cout << "D: " << endl << D << endl;
 }
 
-inline Fisheye::Fisheye(const String& filename)
+Fisheye::Fisheye(const String& filename)
 {
     FileStorage fs(filename, FileStorage::READ);
     if (!fs.isOpened())
@@ -114,7 +96,7 @@ inline Fisheye::Fisheye(const String& filename)
     fs.release();
 }
 
-inline void Fisheye::save(const String& filename) const
+void Fisheye::save(const String& filename) const
 {
     cout << "K: " << endl << K << endl;
     cout << "D: " << endl << D << endl;
@@ -128,12 +110,12 @@ inline void Fisheye::save(const String& filename) const
     cout << "Parameters save to " << filename << endl;
 }
 
-inline void Fisheye::undistort(const Mat& src, Mat& sol) const
+void Fisheye::undistort(const Mat& src, Mat& sol) const
 {
     fisheye::undistortImage(src, sol, K, D, K);
 }
 
-inline void Fisheye::distortPoints(const vector<Point2f>& src, vector<Point2f>& sol) const
+void Fisheye::distortPoints(const vector<Point2f>& src, vector<Point2f>& sol) const
 {
     static const double fx = K.at<double>(0, 0);
     static const double fy = K.at<double>(1, 1);
@@ -149,6 +131,3 @@ inline void Fisheye::distortPoints(const vector<Point2f>& src, vector<Point2f>& 
 
     fisheye::distortPoints(src_, sol, K, D);
 }
-
-
-#endif //FISHEYE_H

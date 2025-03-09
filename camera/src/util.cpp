@@ -1,19 +1,13 @@
-//
-// Created by Yunhao Xu on 25-3-5.
-//
-
-#ifndef UTIL_H
-#define UTIL_H
-
 #include <opencv2/opencv.hpp>
 
+#include "util.h"
 #include "fisheye.h"
 #include "homography.h"
 
 using namespace std;
 using namespace cv;
 
-inline void operator+=(Mat& lhs, const vector<Point2f>& rhs)
+void operator+=(Mat& lhs, const vector<Point2f>& rhs)
 {
     for (const auto& p : rhs)
     {
@@ -21,7 +15,7 @@ inline void operator+=(Mat& lhs, const vector<Point2f>& rhs)
     }
 }
 
-inline vector<Point2f> create_line(Point2f start, Point2f end, int num)
+vector<Point2f> create_line(Point2f start, Point2f end, int num)
 {
     vector<Point2f> line;
     line.reserve(num);
@@ -32,7 +26,7 @@ inline vector<Point2f> create_line(Point2f start, Point2f end, int num)
     return line;
 }
 
-inline vector<Point2f> create_curve(Point2f start, Point2f control, Point2f end, int num)
+vector<Point2f> create_curve(Point2f start, Point2f control, Point2f end, int num)
 {
     vector<Point2f> curve;
     curve.reserve(num);
@@ -46,7 +40,7 @@ inline vector<Point2f> create_curve(Point2f start, Point2f control, Point2f end,
     return curve;
 }
 
-inline void draw_points(const unsigned char *src, unsigned char *sol, int width, int height, const vector<Point2f>& points, const Fisheye& fisheye, const Homography& homography)
+void draw_points(const unsigned char *src, unsigned char *sol, int width, int height, const vector<Point2f>& points, const Fisheye& fisheye, const Homography& homography)
 {
     static vector<Point2f> points_;
     static vector<Point2f> _points_(points.size());
@@ -56,5 +50,3 @@ inline void draw_points(const unsigned char *src, unsigned char *sol, int width,
     img += _points_;
     memcpy(sol, img.data, width * height * 3);
 }
-
-#endif //UTIL_H

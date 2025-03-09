@@ -1,9 +1,3 @@
 .vscode/
-*.o
-*.a
-spinnaker_stream
-demo
-test/
-CMakeLists.txt
 *.yaml
 fisheye_test/*
