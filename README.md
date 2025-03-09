@@ -6,7 +6,7 @@ cmake ..
 make
 ```
 
-You can find the binary file `rcve-hmi` in the `build` directory.
+You can find the binary file `rcve_stream` in the `build` directory.
 
 # Run the video stream
 
