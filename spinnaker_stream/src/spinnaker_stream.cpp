@@ -5,7 +5,12 @@
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
 
-#include "convert_rgb24_to_yuyv_cuda.h"
+#include "spinnaker_stream.h"
+#include "rgb2yuyv.h"
+#include "fisheye.h"
+#include "homography.h"
+#include "util.h"
+#include "sensor.h"
 
 extern "C"
 {
@@ -42,7 +47,6 @@ extern "C"
         return 0;
     }
 
-    // Function to convert Spinnaker PixelFormat to V4L2 format
     __u32 spinnaker_to_v4l2_format(Spinnaker::PixelFormatEnums pixelFormat)
     {
         switch (pixelFormat)
@@ -60,7 +64,6 @@ extern "C"
         }
     }
 
-    // Function to get the pixel format as a string
     const char *pixel_format_to_string(Spinnaker::PixelFormatEnums pixelFormat)
     {
         switch (pixelFormat)
@@ -82,7 +85,6 @@ extern "C"
         }
     }
 
-    // Function to capture frames from the FLIR camera and stream them in supported formats
     void capture_frames(const char *video_device)
     {
         // Open the virtual V4L2 device
@@ -140,9 +142,29 @@ extern "C"
             static unsigned char *imageData = nullptr;
             imageData = static_cast<unsigned char *>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->GetData());
 
+            // add driver line
+            // -----------------------------------------------------------------------------------------------
+            static auto *_img_ = new unsigned char[width * height * 3];
+            static const Fisheye fisheye_camera("fisheye_calibration.yaml");
+            static const Homography homography("homography_calibration.yaml");
+            static vector<Point2f> lines_;
+            static vector<Point2f> _lines_(600);
+            static const auto interpolation_51_100 = [](int x) -> int {
+                return (x * 100 + 50) / 51;
+            };
+            static const SensorBuffer buffer("test/str_whe_phi.csv");
+            static int count = 0;
+            float angle = buffer.get_value(count++) / 4.1f;
+            const vector<Point2f> line_left = create_curve(Point2f(1511, 2047), Point2f(1511, 1663), Point2f(1511 + 125 * tan(angle), 1280), 300);
+            const vector<Point2f> line_right = create_curve(Point2f(1561, 2047), Point2f(1561, 1663), Point2f(1561 + 125 * tan(angle), 1280), 300);
+            vector<Point2f> lines = line_left;
+            lines.insert(lines.end(), line_right.begin(), line_right.end());
+            draw_points(imageData, _img_, width, height, lines, fisheye_camera, homography);
+            // -----------------------------------------------------------------------------------------------
+
             // Convert RGB24 to YUYV422
             static auto *yuyv422 = new unsigned char[width * height * 2];
-            convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
+            convert_rgb24_to_yuyv_cuda(_img_, yuyv422, width, height);
 
             // Configure the virtual video device for YUYV422
             if (!is_configured)

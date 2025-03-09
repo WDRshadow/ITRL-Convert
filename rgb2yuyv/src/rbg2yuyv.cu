@@ -1,7 +1,7 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 
-#include "convert_rgb24_to_yuyv_cuda.h"
+#include "rgb2yuyv.h"
 
 #define Y_R 16896 // 66 * 256
 #define Y_G 33024 // 129 * 256

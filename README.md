@@ -1,10 +1,14 @@
-# Building the binary
+# Build the binary
 ```
-./build.sh
+mkdir build
+cd build
+cmake ..
+make
 ```
-When re-building you may need to manually remove the build files and binary
 
-# Running the example
+You can find the binary file `rcve-hmi` in the `build` directory.
+
+# Run the video stream
 
 First prepare the video devices for receiving the processed video. To do this, run the v4l2 script:
 ```
@@ -13,7 +17,7 @@ sudo ./init_v4l2.sh
 
 Then, you can start streaming video to the first video device by running the binary built in the previous step with
 ```
-sudo ./spinnaker_stream
+sudo ./rcve_stream
 ```
 
 Now the stream is available on `/dev/video16`. If you want to view it, open a new terminal and run
@@ -21,7 +25,11 @@ Now the stream is available on `/dev/video16`. If you want to view it, open a ne
 ffplay /dev/video16
 ```
 
-## RGB24 to YUYV422 Baseline test
+Once the video stream is running, you can use FleetMQ to stream the video to the cloud, or use `Cheese` or `ffplay /dev/video16` to view the video stream.
+
+# Testing
+
+## Baseline
 
 In baseline test, we randomly create 100 image with each 3072x2048 pixels and convert it to YUYV422 format. The test result of time taken to process one image (average) is as follows (run three time and take the average):
 
@@ -43,17 +51,9 @@ For other devices, just for reference, the test result is shown below:
 | Parallel        | 17.2      |
 | CUDA            | 4.2       |
 
-## RGB24 to YUYV422 FleetMQ streaming
+## Production
 
-The converting code has been implemented. You can directly convert the images stream by following the previous steps and running the following command:
-```bash
-./build.sh && sudo ./spinnaker_stream
-```
-Then you can use `Cheese` or `ffplay /dev/video16` to view the video stream.
-
----
-
-For testing, we capture 1000 images and convert them from Bayer to YUYV format then directly write to video device '/dev/video16'. A timmer is used to measure the time taken to process one image (all the way from Bayer to YUYB).
+For production testing, we capture 1000 images and convert them from Bayer to YUYV format then directly write to video device '/dev/video16'. A timmer is used to measure the time taken to process one image (all the way from Bayer to YUYB).
 
 The conversion is implemented using sequential processing, parallel processing, and CUDA processing. The test result of time taken to process one image (average) is as follows (run three time and take the average):
 
