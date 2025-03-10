@@ -68,11 +68,10 @@ DriverLine::DriverLine(const string& fisheye_config, const string& homography_co
 {
 }
 
-
-void DriverLine::update(const unordered_map<string, string>& arg)
+void DriverLine::update(const float str_whe_phi)
 {
     reset_img();
-    const float angle = stof(arg.find("str_whe_phi")->second) / 4.1f;
+    const float angle = str_whe_phi / 4.1f;
     const vector<Point2f> line_left = create_curve(Point2f(1511, 2047), Point2f(1511, 1663), Point2f(1511 + 125 * tan(angle), 1280), 300);
     const vector<Point2f> line_right = create_curve(Point2f(1561, 2047), Point2f(1561, 1663), Point2f(1561 + 125 * tan(angle), 1280), 300);
     vector<Point2f> lines = line_left;
@@ -82,13 +81,25 @@ void DriverLine::update(const unordered_map<string, string>& arg)
     *img += _lines_;
 }
 
-Velocity::Velocity(const int x, const int y): Component(x, y, 200, 200)
+void DriverLine::update(const unordered_map<string, string>& arg)
+{
+    reset_img();
+    update(stof(arg.find("str_whe_phi")->second));
+}
+
+TextComponent::TextComponent(const int x, const int y, const int width, const int height): Component(x, y, width, height)
 {
 }
 
-void Velocity::update(const unordered_map<string, string>& arg)
+void TextComponent::update(const string& text) const
 {
     reset_img();
-    draw_text(to_string(stoi(arg.find("vel")->second)), 200, 200).copyTo(*img);
+    draw_text(text, width, height).copyTo(*img);
+}
+
+
+void TextComponent::update(const unordered_map<string, string>& arg)
+{
+    update(arg.find("text")->second);
 }
 

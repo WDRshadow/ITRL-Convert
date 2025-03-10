@@ -11,28 +11,16 @@
 #include "sensor.h"
 
 extern "C" {
-int configure_video_device(int video_fd, int width, int height, __u32 pixel_format)
+int configure_video_device(int video_fd, int width, int height)
 {
     struct v4l2_format vfmt = {};
     vfmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+    vfmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+    vfmt.fmt.pix.field = V4L2_FIELD_NONE;
     vfmt.fmt.pix.width = width;
     vfmt.fmt.pix.height = height;
-    vfmt.fmt.pix.pixelformat = pixel_format;
-    vfmt.fmt.pix.field = V4L2_FIELD_NONE;
-    switch (pixel_format)
-    {
-    case V4L2_PIX_FMT_RGB24:
-        vfmt.fmt.pix.bytesperline = width * 3;
-        vfmt.fmt.pix.sizeimage = width * height * 3;
-        break;
-    case V4L2_PIX_FMT_YUYV:
-        vfmt.fmt.pix.bytesperline = width * 2;
-        vfmt.fmt.pix.sizeimage = width * height * 2;
-        break;
-    default:
-        std::cerr << "Unsupported pixel format" << std::endl;
-        return -1;
-    }
+    vfmt.fmt.pix.bytesperline = width * 2;
+    vfmt.fmt.pix.sizeimage = width * height * 2;
 
     if (ioctl(video_fd, VIDIOC_S_FMT, &vfmt) < 0)
     {
@@ -41,44 +29,6 @@ int configure_video_device(int video_fd, int width, int height, __u32 pixel_form
     }
 
     return 0;
-}
-
-__u32 spinnaker_to_v4l2_format(Spinnaker::PixelFormatEnums pixelFormat)
-{
-    switch (pixelFormat)
-    {
-    case Spinnaker::PixelFormatEnums::PixelFormat_RGB8:
-        return V4L2_PIX_FMT_RGB24;
-    case Spinnaker::PixelFormatEnums::PixelFormat_BGR8:
-        return V4L2_PIX_FMT_BGR24;
-    case Spinnaker::PixelFormatEnums::PixelFormat_Mono8:
-        return V4L2_PIX_FMT_GREY;
-    case Spinnaker::PixelFormatEnums::PixelFormat_YUV422Packed:
-        return V4L2_PIX_FMT_YUYV; // YUV422 packed (YUYV)
-    default:
-        return 0; // Unsupported format
-    }
-}
-
-const char* pixel_format_to_string(Spinnaker::PixelFormatEnums pixelFormat)
-{
-    switch (pixelFormat)
-    {
-    case Spinnaker::PixelFormatEnums::PixelFormat_Mono8:
-        return "Mono8";
-    case Spinnaker::PixelFormatEnums::PixelFormat_Mono16:
-        return "Mono16";
-    case Spinnaker::PixelFormatEnums::PixelFormat_RGB8:
-        return "RGB8";
-    case Spinnaker::PixelFormatEnums::PixelFormat_BGR8:
-        return "BGR8";
-    case Spinnaker::PixelFormatEnums::PixelFormat_YUV422Packed:
-        return "YUV422Packed";
-    case Spinnaker::PixelFormatEnums::PixelFormat_BayerRG8:
-        return "BayerRG8";
-    default:
-        return "Unknown format";
-    }
 }
 
 void capture_frames(const char* video_device)
@@ -113,14 +63,11 @@ void capture_frames(const char* video_device)
     // Initialize Streaming Component
     StreamImage stream_image(3072, 2048);
     const auto driver_line = make_shared<DriverLine>("fisheye_calibration.yaml", "homography_calibration.yaml");
-    const auto velocity = make_shared<Velocity>(1536, 1462);
+    const auto velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
     stream_image.add_component("driver_line", driver_line);
     stream_image.add_component("velocity", velocity);
-    const SensorBuffer str_whe_phi("test/str_whe_phi.csv");
-    const SensorBuffer vel("test/vel.csv");
-    const auto interpolation_60_100 = [](int x) -> int {
-        return x * 3 / 5;
-    };
+    const SensorAPI str_whe_phi(STR_WHE_PHI);
+    const SensorAPI vel(VEL);
 
     while (true)
     {
@@ -140,7 +87,7 @@ void capture_frames(const char* video_device)
         // Print the pixel format only once
         if (!pixel_format_printed)
         {
-            std::cout << "Captured pixel format: " << pixel_format_to_string(pImage->GetPixelFormat()) << std::endl;
+            std::cout << "Captured pixel format: BayerRG8" << std::endl;
             std::cout << "Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
             std::cout << "Converting to YUYV422 format..." << std::endl;
             pixel_format_printed = true;
@@ -151,16 +98,11 @@ void capture_frames(const char* video_device)
         imageData = static_cast<unsigned char*>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->
                                                         GetData());
 
-        // Add other components to the image
-        // -----------------------------------------------------------------------------------------------
-        static constexpr int start = 15293;
-        static int count = 0;
-        static int index = interpolation_60_100(count++);
-        static auto *_img_ = new unsigned char[width * height * 3];
-        driver_line->update({{"str_whe_phi", to_string(str_whe_phi.get_value(start + index))}});
-        velocity->update({{"vel", to_string(vel.get_value(start + index))}});
+        // Add components to the image
+        static auto* _img_ = new unsigned char[width * height * 3];
+        driver_line->update(str_whe_phi.get_value());
+        velocity->update(to_string(static_cast<int>(vel.get_value())));
         stream_image.update(imageData, _img_);
-        // -----------------------------------------------------------------------------------------------
 
         // Convert RGB24 to YUYV422
         static auto* yuyv422 = new unsigned char[width * height * 2];
@@ -169,7 +111,7 @@ void capture_frames(const char* video_device)
         // Configure the virtual video device for YUYV422
         if (!is_configured)
         {
-            if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_YUYV) != 0)
+            if (configure_video_device(video_fd, width, height) != 0)
             {
                 std::cerr << "Failed to configure virtual device" << std::endl;
                 break;

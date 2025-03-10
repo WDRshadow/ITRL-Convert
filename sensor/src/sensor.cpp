@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <utility>
 #include <vector>
 #include <algorithm>
 
@@ -44,3 +45,20 @@ float SensorBuffer::get_value() const
     static int index = 0;
     return get_value(index++);
 }
+
+int SensorBuffer::size() const
+{
+    return static_cast<int>(val.size());
+}
+
+SensorAPI::SensorAPI(std::string id): id(std::move(id))
+{
+}
+
+float SensorAPI::get_value() const
+{
+    return 0.0f;
+}
+
+
+

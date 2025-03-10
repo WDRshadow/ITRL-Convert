@@ -55,13 +55,15 @@ class DriverLine final : public Component
 
 public:
     DriverLine(const string& fisheye_config, const string& homography_config);
+    void update(float str_whe_phi);
     void update(const unordered_map<string, string>& arg) override;
 };
 
-class Velocity final : public Component
+class TextComponent final : public Component
 {
 public:
-    Velocity(int x, int y);
+    TextComponent(int x, int y, int width, int height);
+    void update(const string& text) const;
     void update(const unordered_map<string, string>& arg) override;
 };
 

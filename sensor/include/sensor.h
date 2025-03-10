@@ -1,16 +1,13 @@
 #ifndef SENSOR_H
 #define SENSOR_H
 
-#define STR_WHE_PHI 0
-#define VEL 1
+#define STR_WHE_PHI "str_whe_phi"
+#define VEL "vel"
 
 #include <vector>
 
 class SensorBase
 {
-protected:
-    std::vector<float> val;
-
 public:
     virtual ~SensorBase() = default;
     [[nodiscard]] virtual float get_value() const = 0;
@@ -18,16 +15,19 @@ public:
 
 class SensorBuffer final : public SensorBase
 {
+    std::vector<float> val;
 public:
     explicit SensorBuffer(const std::string& filename);
     [[nodiscard]] float get_value(int index) const;
     [[nodiscard]] float get_value() const override;
+    [[nodiscard]] int size() const;
 };
 
 class SensorAPI final : public SensorBase
 {
+    const std::string id;
 public:
-    explicit SensorAPI(int id);
+    explicit SensorAPI(std::string id);
     [[nodiscard]] float get_value() const override;
 };
 
