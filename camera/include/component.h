@@ -6,7 +6,14 @@
 #include <memory>
 
 using namespace std;
-using namespace cv;
+
+namespace cv
+{
+    class Mat;
+    template <typename T>
+    class Point_;
+    typedef Point_<float> Point2f;
+}
 
 class Component;
 
@@ -46,8 +53,8 @@ public:
 
 class DriverLine final : public Component
 {
-    vector<Point2f> lines_;
-    vector<Point2f> _lines_;
+    unique_ptr<vector<Point2f>> lines_;
+    unique_ptr<vector<Point2f>> _lines_;
     const Fisheye fisheye_camera;
     const Homography homography_line;
 

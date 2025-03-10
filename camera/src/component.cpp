@@ -66,6 +66,8 @@ DriverLine::DriverLine(const string& fisheye_config, const string& homography_co
     Component(1536, 1024, 3072, 2048), fisheye_camera(Fisheye(fisheye_config)),
     homography_line(Homography(homography_config))
 {
+    lines_ = make_unique<vector<Point2f>>();
+    _lines_ = make_unique<vector<Point2f>>();
 }
 
 
@@ -77,9 +79,9 @@ void DriverLine::update(const unordered_map<string, string>& arg)
     const vector<Point2f> line_right = create_curve(Point2f(1561, 2047), Point2f(1561, 1663), Point2f(1561 + 125 * tan(angle), 1280), 300);
     vector<Point2f> lines = line_left;
     lines.insert(lines.end(), line_right.begin(), line_right.end());
-    homography_line.projectPoints(lines, lines_);
-    fisheye_camera.distortPoints(lines_, _lines_);
-    *img += _lines_;
+    homography_line.projectPoints(lines, *lines_);
+    fisheye_camera.distortPoints(*lines_, *_lines_);
+    *img += *_lines_;
 }
 
 Velocity::Velocity(const int x, const int y): Component(x, y, 200, 200)

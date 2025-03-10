@@ -6,7 +6,6 @@
 #include "sensor.h"
 
 using namespace std;
-using namespace cv;
 
 int main()
 {

@@ -1,6 +1,8 @@
 #ifndef HOMOGRAPHY_H
 #define HOMOGRAPHY_H
 
+#include <opencv2/opencv.hpp>
+
 using namespace std;
 using namespace cv;
 

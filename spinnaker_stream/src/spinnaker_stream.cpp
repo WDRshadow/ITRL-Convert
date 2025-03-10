@@ -8,7 +8,6 @@
 #include "spinnaker_stream.h"
 #include "component.h"
 #include "rgb2yuyv.h"
-#include "util.h"
 #include "sensor.h"
 
 extern "C" {

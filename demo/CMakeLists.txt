@@ -12,7 +12,6 @@ add_executable(demo
 
 target_include_directories(demo
         PUBLIC
-        ${OpenCV_INCLUDE_DIRS}
         include
         ${CMAKE_SOURCE_DIR}/sensor/include
         ${CMAKE_SOURCE_DIR}/camera/include
