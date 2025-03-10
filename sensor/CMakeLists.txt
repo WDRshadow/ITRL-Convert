@@ -4,8 +4,6 @@ project(sensor)
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(OpenCV REQUIRED)
-
 add_library(sensor
         STATIC
         src/sensor.cpp
