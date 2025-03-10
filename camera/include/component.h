@@ -1,19 +1,14 @@
 #ifndef COMPONENT_H
 #define COMPONENT_H
-#include <fisheye.h>
-#include <homography.h>
 #include <unordered_map>
 #include <memory>
+#include <opencv2/opencv.hpp>
+
+#include "fisheye.h"
+#include "homography.h"
 
 using namespace std;
-
-namespace cv
-{
-    class Mat;
-    template <typename T>
-    class Point_;
-    typedef Point_<float> Point2f;
-}
+using namespace cv;
 
 class Component;
 
@@ -53,8 +48,8 @@ public:
 
 class DriverLine final : public Component
 {
-    unique_ptr<vector<Point2f>> lines_;
-    unique_ptr<vector<Point2f>> _lines_;
+    vector<Point2f> lines_;
+    vector<Point2f> _lines_;
     const Fisheye fisheye_camera;
     const Homography homography_line;
 

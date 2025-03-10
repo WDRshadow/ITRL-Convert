@@ -4,6 +4,8 @@ project(spinnaker_stream)
 
 set(CMAKE_CXX_STANDARD 17)
 
+find_package(OpenCV REQUIRED)
+
 add_library(spinnaker_stream
         STATIC
         src/spinnaker_stream.cpp
@@ -13,6 +15,7 @@ target_include_directories(spinnaker_stream
         PUBLIC
         include
         /usr/include/spinnaker
+        ${OpenCV_INCLUDE_DIRS}
         ${CMAKE_SOURCE_DIR}/sensor/include
         ${CMAKE_SOURCE_DIR}/rgb2yuyv/include
         ${CMAKE_SOURCE_DIR}/camera/include
