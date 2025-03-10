@@ -11,6 +11,7 @@ add_library(camera
         src/fisheye.cpp
         src/homography.cpp
         src/util.cpp
+        src/component.cpp
 )
 
 target_include_directories(camera

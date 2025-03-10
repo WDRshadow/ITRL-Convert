@@ -1,8 +1,6 @@
 #include <opencv2/opencv.hpp>
 
 #include "util.h"
-#include "fisheye.h"
-#include "homography.h"
 
 using namespace std;
 using namespace cv;
@@ -40,13 +38,27 @@ vector<Point2f> create_curve(Point2f start, Point2f control, Point2f end, int nu
     return curve;
 }
 
-void draw_points(const unsigned char *src, unsigned char *sol, int width, int height, const vector<Point2f>& points, const Fisheye& fisheye, const Homography& homography)
+Mat draw_text(const string& str, const int width, const int height)
 {
-    static vector<Point2f> points_;
-    static vector<Point2f> _points_(points.size());
-    auto img = Mat(Size(width, height), CV_8UC3, (void*)src);
-    homography.projectPoints(points, points_);
-    fisheye.distortPoints(points_, _points_);
-    img += _points_;
-    memcpy(sol, img.data, width * height * 3);
+    Mat image = Mat::zeros(height, width, CV_8UC3);
+    double scale = height / 150.0;
+    int thickness = max(1, height / 20);
+    int baseline = 0;
+    Size text_size = getTextSize(str, FONT_HERSHEY_SIMPLEX, scale, thickness, &baseline);
+    Point text_origin((width - text_size.width) / 2, (height + text_size.height) / 2);
+    putText(image, str, text_origin, FONT_HERSHEY_SIMPLEX, scale, Scalar(255, 255, 255), thickness);
+    return image;
+}
+
+void overlay_image(Mat& background, const Point& center, const Mat& img)
+{
+    Mat gray, mask;
+    cvtColor(img, gray, COLOR_BGR2GRAY);
+    threshold(gray, mask, 1, 255, THRESH_BINARY);
+    int x = center.x - img.cols / 2;
+    int y = center.y - img.rows / 2;
+    x = max(0, min(x, background.cols - img.cols));
+    y = max(0, min(y, background.rows - img.rows));
+    Rect roi(x, y, img.cols, img.rows);
+    img.copyTo(background(roi), mask);
 }

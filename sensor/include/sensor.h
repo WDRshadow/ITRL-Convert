@@ -1,21 +1,35 @@
 #ifndef SENSOR_H
 #define SENSOR_H
 
+#define STR_WHE_PHI 0
+#define VEL 1
+
 #include <vector>
 
-using namespace std;
-
-class SensorBuffer
+class SensorBase
 {
 protected:
-    vector<float> val;
+    std::vector<float> val;
 
 public:
-    virtual ~SensorBuffer() = default;
-    SensorBuffer() = default;
-    explicit SensorBuffer(const string& filename);
-    [[nodiscard]] float get_value(int index) const;
-    [[nodiscard]] virtual float get_value() const;
+    virtual ~SensorBase() = default;
+    [[nodiscard]] virtual float get_value() const = 0;
 };
+
+class SensorBuffer final : public SensorBase
+{
+public:
+    explicit SensorBuffer(const std::string& filename);
+    [[nodiscard]] float get_value(int index) const;
+    [[nodiscard]] float get_value() const override;
+};
+
+class SensorAPI final : public SensorBase
+{
+public:
+    explicit SensorAPI(int id);
+    [[nodiscard]] float get_value() const override;
+};
+
 
 #endif //SENSOR_H
