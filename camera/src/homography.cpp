@@ -9,7 +9,7 @@ Homography::Homography(const vector<Point2f> *srcPoints, const vector<Point2f> *
 {
     if (srcPoints->size() != dstPoints->size() || srcPoints->size() < 4)
     {
-        cerr << "Error: There must be at least 4 points and the number of source and destination points must be the same." << endl;
+        cerr << "[homography] There must be at least 4 points and the number of source and destination points must be the same." << endl;
         return;
     }
     H = findHomography(*srcPoints, *dstPoints, RANSAC);
@@ -20,7 +20,7 @@ Homography::Homography(const String &filename)
     FileStorage fs(filename, FileStorage::READ);
     if (!fs.isOpened())
     {
-        cerr << "Cannot open file " << filename << endl;
+        cerr << "[homography] Cannot open file " << filename << endl;
         return;
     }
     fs["H"] >> H;
@@ -38,7 +38,7 @@ void Homography::projectPoints(const vector<Point2f> &srcPoints, vector<Point2f>
 {
     if (H.empty())
     {
-        cerr << "Error: Homography matrix is empty." << endl;
+        cerr << "[homography] Homography matrix is empty." << endl;
         return;
     }
     perspectiveTransform(srcPoints, dstPoints, H);

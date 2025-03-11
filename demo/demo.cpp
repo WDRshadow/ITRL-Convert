@@ -12,7 +12,7 @@ int main()
     VideoCapture cap("data/demo.mp4");
     if (!cap.isOpened())
     {
-        cerr << "Error: cannot open the video file" << endl;
+        cerr << "[demo] cannot open the video file" << endl;
         return -1;
     }
     Mat frame;

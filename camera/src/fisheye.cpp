@@ -12,7 +12,7 @@ Fisheye::Fisheye(Size boardSize, float squareSize, const String* filename)
 
     if (imageFiles.empty())
     {
-        cout << "No images found." << endl;
+        cout << "[fisheye] No images found." << endl;
         return;
     }
 
@@ -34,7 +34,7 @@ Fisheye::Fisheye(Size boardSize, float squareSize, const String* filename)
         Mat img = imread(imageFile);
         if (img.empty())
         {
-            cout << "Cannot load image: " << imageFile << endl;
+            cout << "[fisheye] Cannot load image: " << imageFile << endl;
             continue;
         }
         imageSize = img.size();
@@ -55,13 +55,13 @@ Fisheye::Fisheye(Size boardSize, float squareSize, const String* filename)
         }
         else
         {
-            cout << "No Chessboard detected: " << imageFile << endl;
+            cout << "[fisheye] No Chessboard detected: " << imageFile << endl;
         }
     }
 
     if (imagePoints.empty())
     {
-        cout << "No enough data for criteria." << endl;
+        cout << "[fisheye] No enough data for criteria." << endl;
         return;
     }
 
@@ -71,16 +71,16 @@ Fisheye::Fisheye(Size boardSize, float squareSize, const String* filename)
 
     TermCriteria criteria(TermCriteria::COUNT + TermCriteria::EPS, 100, 1e-6);
 
-    cout << "Number of object points: " << objectPoints.size() << endl;
-    cout << "Number of image points: " << imagePoints.size() << endl;
-    cout << "Image size: " << imageSize << endl;
+    cout << "[fisheye] Number of object points: " << objectPoints.size() << endl;
+    cout << "[fisheye] Number of image points: " << imagePoints.size() << endl;
+    cout << "[fisheye] Image size: " << imageSize << endl;
 
     double rms = calibrate(objectPoints, imagePoints, imageSize, K, D, rvecs, tvecs,
                            fisheye::CALIB_RECOMPUTE_EXTRINSIC, criteria);
 
-    cout << "RMS: " << rms << endl;
-    cout << "K: " << endl << K << endl;
-    cout << "D: " << endl << D << endl;
+    cout << "[fisheye] RMS: " << rms << endl;
+    cout << "[fisheye] K: " << endl << K << endl;
+    cout << "[fisheye] D: " << endl << D << endl;
 }
 
 Fisheye::Fisheye(const String& filename)
@@ -88,7 +88,7 @@ Fisheye::Fisheye(const String& filename)
     FileStorage fs(filename, FileStorage::READ);
     if (!fs.isOpened())
     {
-        cout << "Cannot open file " << filename << endl;
+        cout << "[fisheye] Cannot open file " << filename << endl;
         return;
     }
     fs["K"] >> K;
@@ -98,16 +98,15 @@ Fisheye::Fisheye(const String& filename)
 
 void Fisheye::save(const String& filename) const
 {
-    cout << "K: " << endl << K << endl;
-    cout << "D: " << endl << D << endl;
+    cout << "[fisheye] K: " << endl << K << endl;
+    cout << "[fisheye] D: " << endl << D << endl;
 
-    // 将标定结果保存到文件中
     FileStorage fs(filename, FileStorage::WRITE);
     fs << "K" << K;
     fs << "D" << D;
     fs.release();
 
-    cout << "Parameters save to " << filename << endl;
+    cout << "[fisheye] Parameters save to " << filename << endl;
 }
 
 void Fisheye::undistort(const Mat& src, Mat& sol) const

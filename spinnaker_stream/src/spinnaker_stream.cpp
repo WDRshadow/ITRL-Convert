@@ -26,7 +26,7 @@ int configure_video_device(int video_fd, int width, int height)
 
     if (ioctl(video_fd, VIDIOC_S_FMT, &vfmt) < 0)
     {
-        std::cerr << "Failed to set video format on virtual device" << std::endl;
+        std::cerr << "[spinnaker stream] Failed to set video format on virtual device" << std::endl;
         return -1;
     }
 
@@ -39,7 +39,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     int video_fd = open(video_device, O_WRONLY);
     if (video_fd < 0)
     {
-        std::cerr << "Failed to open virtual video device" << std::endl;
+        std::cerr << "[spinnaker stream] Failed to open virtual video device" << std::endl;
         return;
     }
 
@@ -49,7 +49,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
 
     if (camList.GetSize() == 0)
     {
-        std::cerr << "No cameras detected!" << std::endl;
+        std::cerr << "[spinnaker stream] No cameras detected!" << std::endl;
         return;
     }
 
@@ -86,7 +86,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         vel = new SensorAPI(Velocity, buffer, buffer_size, bufferMutex);
     }
     else {
-        std::cerr << "Failed to connect to sensors." << std::endl;
+        std::cerr << "[spinnaker stream] Failed to connect to sensors." << std::endl;
     }
 
     while (true)
@@ -100,16 +100,16 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
 
         if (pImage->IsIncomplete())
         {
-            std::cerr << "Image incomplete: " << pImage->GetImageStatus() << std::endl;
+            std::cerr << "[spinnaker stream] Image incomplete: " << pImage->GetImageStatus() << std::endl;
             continue;
         }
 
         // Print the pixel format only once
         if (!pixel_format_printed)
         {
-            std::cout << "Captured pixel format: BayerRG8" << std::endl;
-            std::cout << "Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
-            std::cout << "Converting to YUYV422 format..." << std::endl;
+            std::cout << "[spinnaker stream] Captured pixel format: BayerRG8" << std::endl;
+            std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
+            std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
             pixel_format_printed = true;
         }
 
@@ -135,7 +135,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         {
             if (configure_video_device(video_fd, width, height) != 0)
             {
-                std::cerr << "Failed to configure virtual device" << std::endl;
+                std::cerr << "[spinnaker stream] Failed to configure virtual device" << std::endl;
                 break;
             }
             is_configured = true;
@@ -144,7 +144,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
         if (write(video_fd, yuyv422, width * height * 2) == -1)
         {
-            std::cerr << "Error writing frame to virtual device" << std::endl;
+            std::cerr << "[spinnaker stream] Error writing frame to virtual device" << std::endl;
             break;
         }
 

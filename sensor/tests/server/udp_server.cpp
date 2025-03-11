@@ -28,14 +28,14 @@ void start_server() {
 
     int optval = 1;
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval)) < 0) {
-        std::cerr << "setsockopt(SO_REUSEPORT) failed." << std::endl;
+        std::cerr << "[udp server] setsockopt(SO_REUSEPORT) failed." << std::endl;
         close(sock);
         return;
     }
 
     int broadcastEnable = 1;
     if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable)) < 0) {
-        perror("broadcast enable failed");
+        perror("[udp server] broadcast enable failed");
         close(sock);
         exit(EXIT_FAILURE);
     }
@@ -47,7 +47,7 @@ void start_server() {
     localAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     if (bind(sock, reinterpret_cast<sockaddr*>(&localAddr), sizeof(localAddr)) < 0) {
-        perror("bind failed");
+        perror("[udp server] bind failed");
         close(sock);
         exit(EXIT_FAILURE);
     }
@@ -57,7 +57,7 @@ void start_server() {
     broadcastAddr.sin_family = AF_INET;
     broadcastAddr.sin_port = htons(PORT);
     broadcastAddr.sin_addr.s_addr = inet_addr(BROADCAST_IP);
-    std::cout << "Broadcasting data to " << BROADCAST_IP << std::endl;
+    std::cout << "[udp server] Broadcasting data to " << BROADCAST_IP << std::endl;
 
     while (true) {
         uint32_t buffer[NUM_FLOATS];
@@ -69,7 +69,7 @@ void start_server() {
         ssize_t sentBytes = sendto(sock, buffer, sizeof(buffer), 0,
                                    reinterpret_cast<sockaddr*>(&broadcastAddr), sizeof(broadcastAddr));
         if (sentBytes < 0) {
-            perror("sendto failed");
+            perror("[udp server] sendto failed");
         }
 
         sleep(1);

@@ -13,7 +13,7 @@ demo_sensor::demo_sensor(const std::string& filename)
     ifstream file(filename);
     if (!file.is_open())
     {
-        cerr << "Error: cannot open the file" << endl;
+        cerr << "[demo] cannot open the file" << endl;
         return;
     }
     string line;
