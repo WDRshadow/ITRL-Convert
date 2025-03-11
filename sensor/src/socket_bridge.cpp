@@ -8,7 +8,7 @@
 
 #include "socket_bridge.h"
 
-SocketBridge::SocketBridge(const std::string& ip, int port)
+SocketBridge::SocketBridge(const std::string &ip, int port)
     : sockfd_(-1)
 {
     sockfd_ = socket(AF_INET, SOCK_DGRAM, 0);
@@ -23,6 +23,7 @@ SocketBridge::SocketBridge(const std::string& ip, int port)
     {
         std::cerr << "[socket bridge] setsockopt(SO_REUSEPORT) failed." << std::endl;
         close(sockfd_);
+        sockfd_ = -1;
         return;
     }
 
@@ -31,10 +32,11 @@ SocketBridge::SocketBridge(const std::string& ip, int port)
     localAddr_.sin_addr.s_addr = inet_addr(ip.c_str());
     localAddr_.sin_port = htons(port);
 
-    if (bind(sockfd_, reinterpret_cast<const sockaddr*>(&localAddr_), sizeof(localAddr_)) < 0)
+    if (bind(sockfd_, reinterpret_cast<const sockaddr *>(&localAddr_), sizeof(localAddr_)) < 0)
     {
         std::cerr << "[socket bridge] Port bind failed." << std::endl;
         close(sockfd_);
+        sockfd_ = -1;
         return;
     }
 }
@@ -52,7 +54,7 @@ bool SocketBridge::isValid() const
     return sockfd_ != -1;
 }
 
-ssize_t SocketBridge::receiveData(char* buffer, const size_t bufferSize) const
+ssize_t SocketBridge::receiveData(char *buffer, const size_t bufferSize) const
 {
     if (sockfd_ < 0)
     {
@@ -61,24 +63,16 @@ ssize_t SocketBridge::receiveData(char* buffer, const size_t bufferSize) const
     sockaddr_in serverAddr{};
     socklen_t senderLen = sizeof(serverAddr);
     return recvfrom(sockfd_, buffer, bufferSize, 0,
-                    reinterpret_cast<sockaddr*>(&serverAddr), &senderLen);
+                    reinterpret_cast<sockaddr *>(&serverAddr), &senderLen);
 }
 
-[[noreturn]] void receive_data_loop(const std::string& ip, const int port, char* buffer, const size_t bufferSize,
-                                    std::shared_mutex& bufferMutex)
+void receive_data_loop(const SocketBridge *bridge, char *buffer, const size_t bufferSize,
+                       std::shared_mutex &bufferMutex)
 {
-    const SocketBridge bridge(ip, port);
-    if (!bridge.isValid())
-    {
-        std::cerr << "[socket bridge] Socket bridge initialized failed." << std::endl;
-        return;
-    }
-
     auto localBuffer = new char[bufferSize];
-
     while (true)
     {
-        bridge.receiveData(localBuffer, bufferSize);
+        bridge->receiveData(localBuffer, bufferSize);
         std::lock_guard lock(bufferMutex);
         std::memcpy(buffer, localBuffer, bufferSize);
     }

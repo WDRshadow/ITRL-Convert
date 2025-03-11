@@ -1,5 +1,6 @@
 #include <vector>
 #include <shared_mutex>
+#include <cstring>
 
 #include "sensor.h"
 

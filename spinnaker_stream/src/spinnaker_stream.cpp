@@ -63,18 +63,31 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     camera->BeginAcquisition();
 
     // Initialize Streaming Component
-    StreamImage stream_image(3072, 2048);
-    const auto driver_line = make_shared<DriverLine>("fisheye_calibration.yaml", "homography_calibration.yaml");
-    const auto velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
-    stream_image.add_component("driver_line", driver_line);
-    stream_image.add_component("velocity", velocity);
-    std::shared_mutex bufferMutex;
-    constexpr int buffer_size = 8192;
-    auto buffer = new char[buffer_size];
-    std::thread t(receive_data_loop, ip, port, std::ref(buffer), 8192, std::ref(bufferMutex));
-    t.detach();
-    const SensorAPI str_whe_phi(RemoteSteeringAngle, buffer, buffer_size, bufferMutex);
-    const SensorAPI vel(Velocity, buffer, buffer_size, bufferMutex);
+    StreamImage* stream_image = nullptr;
+    std::shared_ptr<DriverLine> driver_line = nullptr;
+    std::shared_ptr<TextComponent> velocity = nullptr;
+    SensorAPI* str_whe_phi = nullptr;
+    SensorAPI* vel = nullptr;
+    char* buffer = nullptr;
+    const SocketBridge bridge(ip, port);
+    if (bridge.isValid())
+    {
+        stream_image = new StreamImage(3072, 2048);
+        driver_line = make_shared<DriverLine>("fisheye_calibration.yaml", "homography_calibration.yaml");
+        velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
+        stream_image->add_component("driver_line", driver_line);
+        stream_image->add_component("velocity", velocity);
+        std::shared_mutex bufferMutex;
+        constexpr int buffer_size = 8192;
+        buffer = new char[buffer_size];
+        std::thread t(receive_data_loop, &bridge, buffer, buffer_size, std::ref(bufferMutex));
+        t.detach();
+        str_whe_phi = new SensorAPI(RemoteSteeringAngle, buffer, buffer_size, bufferMutex);
+        vel = new SensorAPI(Velocity, buffer, buffer_size, bufferMutex);
+    }
+    else {
+        std::cerr << "Failed to connect to sensors." << std::endl;
+    }
 
     while (true)
     {
@@ -106,14 +119,16 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
                                                         GetData());
 
         // Add components to the image
-        static auto* _img_ = new unsigned char[width * height * 3];
-        driver_line->update(str_whe_phi.get_value());
-        velocity->update(to_string(static_cast<int>(vel.get_value())));
-        stream_image.update(imageData, _img_);
+        if (bridge.isValid())
+        {
+            driver_line->update(str_whe_phi->get_value());
+            velocity->update(to_string(static_cast<int>(vel->get_value())));
+            stream_image->update(imageData, imageData);
+        }
 
         // Convert RGB24 to YUYV422
         static auto* yuyv422 = new unsigned char[width * height * 2];
-        convert_rgb24_to_yuyv_cuda(_img_, yuyv422, width, height);
+        convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
 
         // Configure the virtual video device for YUYV422
         if (!is_configured)

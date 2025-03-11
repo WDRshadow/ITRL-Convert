@@ -57,6 +57,7 @@ void start_server() {
     broadcastAddr.sin_family = AF_INET;
     broadcastAddr.sin_port = htons(PORT);
     broadcastAddr.sin_addr.s_addr = inet_addr(BROADCAST_IP);
+    std::cout << "Broadcasting data to " << BROADCAST_IP << std::endl;
 
     while (true) {
         uint32_t buffer[NUM_FLOATS];
@@ -69,8 +70,6 @@ void start_server() {
                                    reinterpret_cast<sockaddr*>(&broadcastAddr), sizeof(broadcastAddr));
         if (sentBytes < 0) {
             perror("sendto failed");
-        } else {
-            std::cout << "Sent udp data: " << sentBytes << std::endl;
         }
 
         sleep(1);

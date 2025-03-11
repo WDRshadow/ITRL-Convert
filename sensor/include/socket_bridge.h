@@ -10,13 +10,13 @@ class SocketBridge
     sockaddr_in localAddr_{};
 
 public:
-    SocketBridge(const std::string& ip, int port);
+    SocketBridge(const std::string &ip, int port);
     ~SocketBridge();
     [[nodiscard]] bool isValid() const;
-    ssize_t receiveData(char* buffer, size_t bufferSize) const;
+    ssize_t receiveData(char *buffer, size_t bufferSize) const;
 };
 
-[[noreturn]] void receive_data_loop(const std::string& ip, int port, char* buffer, size_t bufferSize,
-                                    std::shared_mutex& bufferMutex);
+void receive_data_loop(const SocketBridge *bridge, char *buffer, const size_t bufferSize,
+                       std::shared_mutex &bufferMutex);
 
-#endif //SOCKET_BRIDGE_H
+#endif // SOCKET_BRIDGE_H
