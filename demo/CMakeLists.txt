@@ -8,12 +8,11 @@ find_package(OpenCV REQUIRED)
 
 add_executable(demo
         demo.cpp
+        demo_sensor.cpp
 )
 
 target_include_directories(demo
         PUBLIC
-        include
-        ${CMAKE_SOURCE_DIR}/sensor/include
         ${CMAKE_SOURCE_DIR}/camera/include
 )
 
@@ -21,4 +20,4 @@ set_target_properties(demo PROPERTIES
         POSITION_INDEPENDENT_CODE ON
 )
 
-target_link_libraries(demo ${OpenCV_LIBS} camera sensor)
+target_link_libraries(demo ${OpenCV_LIBS} camera)

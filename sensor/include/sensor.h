@@ -1,35 +1,41 @@
 #ifndef SENSOR_H
 #define SENSOR_H
 
-#define STR_WHE_PHI "str_whe_phi"
-#define VEL "vel"
+#define RemoteSteeringAngle 0
+#define IncPkgNr 1
+#define ThrottlePerc 2
+#define BrkPerc 3
+#define RollRate 4
+#define PitchRate 5
+#define YawRate 6
+#define AZ 7
+#define AY 8
+#define AX 9
+#define Velocity 10
+#define SteeringFeedbackTorque 11
+#define Motor1 12
+#define Motor2 13
+#define Motor3 14
+#define Motor4 15
+#define Motor5 16
+#define Motor6 17
+#define XXXXX_ 18
 
-#include <vector>
-
-class SensorBase
+class SensorAPI
 {
+    const int id;
+    const int buffer_size;
+    char* buffer;
+    char* local_buffer;
+    std::shared_mutex& bufferMutex;
+
 public:
-    virtual ~SensorBase() = default;
-    [[nodiscard]] virtual float get_value() const = 0;
+    explicit SensorAPI(int id, char* buffer, int buffer_size, std::shared_mutex& bufferMutex);
+    [[nodiscard]] float get_value() const;
 };
 
-class SensorBuffer final : public SensorBase
-{
-    std::vector<float> val;
-public:
-    explicit SensorBuffer(const std::string& filename);
-    [[nodiscard]] float get_value(int index) const;
-    [[nodiscard]] float get_value() const override;
-    [[nodiscard]] int size() const;
-};
-
-class SensorAPI final : public SensorBase
-{
-    const std::string id;
-public:
-    explicit SensorAPI(std::string id);
-    [[nodiscard]] float get_value() const override;
-};
+uint32_t BigEndianToUint32(const char* bytes);
+float BigEndianToFloat(const char* bytes);
 
 
 #endif //SENSOR_H

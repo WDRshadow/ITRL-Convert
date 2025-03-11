@@ -4,10 +4,12 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
+#include <thread>
 
 #include "spinnaker_stream.h"
 #include "component.h"
 #include "rgb2yuyv.h"
+#include "socket_bridge.h"
 #include "sensor.h"
 
 extern "C" {
@@ -31,7 +33,7 @@ int configure_video_device(int video_fd, int width, int height)
     return 0;
 }
 
-void capture_frames(const char* video_device)
+void capture_frames(const char* video_device, const std::string& ip, const int port)
 {
     // Open the virtual V4L2 device
     int video_fd = open(video_device, O_WRONLY);
@@ -66,8 +68,13 @@ void capture_frames(const char* video_device)
     const auto velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
     stream_image.add_component("driver_line", driver_line);
     stream_image.add_component("velocity", velocity);
-    const SensorAPI str_whe_phi(STR_WHE_PHI);
-    const SensorAPI vel(VEL);
+    std::shared_mutex bufferMutex;
+    constexpr int buffer_size = 8192;
+    auto buffer = new char[buffer_size];
+    std::thread t(receive_data_loop, ip, port, std::ref(buffer), 8192, std::ref(bufferMutex));
+    t.detach();
+    const SensorAPI str_whe_phi(RemoteSteeringAngle, buffer, buffer_size, bufferMutex);
+    const SensorAPI vel(Velocity, buffer, buffer_size, bufferMutex);
 
     while (true)
     {

@@ -2,12 +2,17 @@ cmake_minimum_required(VERSION 3.18)
 
 project(sensor)
 
+enable_testing()
+
 set(CMAKE_CXX_STANDARD 17)
 
 add_library(sensor
         STATIC
         src/sensor.cpp
+        src/socket_bridge.cpp
 )
+
+add_subdirectory(tests)
 
 target_include_directories(sensor
         PUBLIC

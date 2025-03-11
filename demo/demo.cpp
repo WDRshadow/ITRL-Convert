@@ -3,7 +3,7 @@
 #include <fstream>
 
 #include "component.h"
-#include "sensor.h"
+#include "demo_sensor.h"
 
 using namespace std;
 
@@ -17,8 +17,8 @@ int main()
     }
     Mat frame;
 
-    const SensorBuffer str_whe_phi("data/str_whe_phi.csv");
-    const SensorBuffer vel("data/vel.csv");
+    const demo_sensor str_whe_phi("data/str_whe_phi.csv");
+    const demo_sensor vel("data/vel.csv");
 
     const auto interpolation_51_100 = [](int x) -> int
     {

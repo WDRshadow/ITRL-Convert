@@ -1,63 +1,40 @@
-#include <fstream>
-#include <iostream>
-#include <sstream>
 #include <vector>
-#include <algorithm>
+#include <shared_mutex>
 
 #include "sensor.h"
 
 using namespace std;
 
-SensorBuffer::SensorBuffer(const string& filename)
+SensorAPI::SensorAPI(const int id, char* buffer, const int buffer_size, std::shared_mutex& bufferMutex):
+    id(id), buffer(buffer), buffer_size(buffer_size), bufferMutex(bufferMutex)
 {
-    ifstream file(filename);
-    if (!file.is_open())
-    {
-        cerr << "Error: cannot open the file" << endl;
-        return;
-    }
-    string line;
-    while (getline(file, line))
-    {
-        stringstream ss(line);
-        string value;
-        if (getline(ss, value, ','))
-        {
-            value.erase(remove_if(value.begin(), value.end(), [](char c)
-            {
-                return !isdigit(c) && c != '.' && c != '-';
-            }), value.end());
-            val.push_back(stof(value));
-        }
-    }
-
-    file.close();
-}
-
-float SensorBuffer::get_value(int index) const
-{
-    return val[index];
-}
-
-float SensorBuffer::get_value() const
-{
-    static int index = 0;
-    return get_value(index++);
-}
-
-int SensorBuffer::size() const
-{
-    return static_cast<int>(val.size());
-}
-
-SensorAPI::SensorAPI(std::string id): id(std::move(id))
-{
+    local_buffer = new char[buffer_size];
 }
 
 float SensorAPI::get_value() const
 {
-    return 0.0f;
+    std::shared_lock lock(bufferMutex);
+    std::memcpy(local_buffer, buffer, buffer_size * sizeof(char));
+    lock.unlock();
+    if (id == IncPkgNr)
+    {
+        return static_cast<float>(BigEndianToUint32(local_buffer + id * sizeof(float)));
+    }
+    return BigEndianToFloat(local_buffer + id * sizeof(float));
 }
 
+uint32_t BigEndianToUint32(const char* bytes)
+{
+    return static_cast<uint32_t>(static_cast<unsigned char>(bytes[0])) << 24 |
+        static_cast<uint32_t>(static_cast<unsigned char>(bytes[1])) << 16 |
+        static_cast<uint32_t>(static_cast<unsigned char>(bytes[2])) << 8 |
+        static_cast<uint32_t>(static_cast<unsigned char>(bytes[3])) << 0;
+}
 
-
+float BigEndianToFloat(const char* bytes)
+{
+    uint32_t tmp = BigEndianToUint32(bytes);
+    float f;
+    std::memcpy(&f, &tmp, sizeof(f));
+    return f;
+}
