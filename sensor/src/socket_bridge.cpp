@@ -9,7 +9,7 @@
 #include "socket_bridge.h"
 
 SocketBridge::SocketBridge(const std::string &ip, int port)
-    : sockfd_(-1)
+    : sockfd_(-1), localAddr_()
 {
     sockfd_ = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd_ < 0)
@@ -49,6 +49,12 @@ SocketBridge::~SocketBridge()
     }
 }
 
+void SocketBridge::discard()
+{
+    sockfd_ = -1;
+}
+
+
 bool SocketBridge::isValid() const
 {
     return sockfd_ != -1;
@@ -67,13 +73,18 @@ ssize_t SocketBridge::receiveData(char *buffer, const size_t bufferSize) const
 }
 
 void receive_data_loop(const SocketBridge *bridge, char *buffer, const size_t bufferSize,
-                       std::shared_mutex &bufferMutex)
+                                    std::shared_mutex &bufferMutex)
 {
     auto localBuffer = new char[bufferSize];
     while (true)
     {
+        if (!bridge->isValid())
+        {
+            break;
+        }
         bridge->receiveData(localBuffer, bufferSize);
         std::lock_guard lock(bufferMutex);
         std::memcpy(buffer, localBuffer, bufferSize);
     }
+    delete[] localBuffer;
 }
