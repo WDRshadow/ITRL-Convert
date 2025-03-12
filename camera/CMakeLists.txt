@@ -24,18 +24,3 @@ add_library(camera
 set_target_properties(camera PROPERTIES
         POSITION_INDEPENDENT_CODE ON
 )
-
-add_executable(fisheye_criteria
-        src/fisheye.cpp
-        fisheye_criteria.cpp
-)
-
-add_executable(fisheye_undistort
-        src/fisheye.cpp
-        fisheye_undistort.cpp
-)
-
-add_executable(homography_criteria
-        src/homography.cpp
-        homography_criteria.cpp
-)

@@ -19,7 +19,13 @@
 #define Motor4 15
 #define Motor5 16
 #define Motor6 17
-#define XXXXX_ 18
+#define RPM 18
+#define RoadDetail 19
+#define XXXXX_1 20
+#define XXXXX_2 21
+#define XXXXX_3 22
+#define XXXXX_4 23
+#define XXXXX_5 24
 
 class SensorAPI
 {

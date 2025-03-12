@@ -15,4 +15,9 @@ add_subdirectory(demo)
 
 add_executable(rcve_stream main.cpp)
 
+target_include_directories(rcve_stream 
+        PUBLIC 
+        ${OpenCV_INCLUDE_DIRS}
+)
+
 target_link_libraries(rcve_stream ${OpenCV_LIBS} spinnaker_stream sensor rgb2yuyv camera Spinnaker)

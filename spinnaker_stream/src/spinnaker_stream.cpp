@@ -63,30 +63,17 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     camera->BeginAcquisition();
 
     // Initialize Streaming Component
-    StreamImage* stream_image = nullptr;
-    std::shared_ptr<DriverLine> driver_line = nullptr;
-    std::shared_ptr<TextComponent> velocity = nullptr;
-    SensorAPI* str_whe_phi = nullptr;
-    SensorAPI* vel = nullptr;
-    char* buffer = nullptr;
-    const SocketBridge bridge(ip, port);
-    if (bridge.isValid())
+    bool is_sensor_connected = false;
+    SocketBridge* bridge;
+    if (port != -1)
     {
-        stream_image = new StreamImage(3072, 2048);
-        driver_line = make_shared<DriverLine>("fisheye_calibration.yaml", "homography_calibration.yaml");
-        velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
-        stream_image->add_component("driver_line", driver_line);
-        stream_image->add_component("velocity", velocity);
-        std::shared_mutex bufferMutex;
-        constexpr int buffer_size = 8192;
-        buffer = new char[buffer_size];
-        std::thread t(receive_data_loop, &bridge, buffer, buffer_size, std::ref(bufferMutex));
-        t.detach();
-        str_whe_phi = new SensorAPI(RemoteSteeringAngle, buffer, buffer_size, bufferMutex);
-        vel = new SensorAPI(Velocity, buffer, buffer_size, bufferMutex);
+        bridge = new SocketBridge(ip, port);
+        is_sensor_connected = bridge->isValid();
     }
-    else {
-        std::cerr << "[spinnaker stream] Failed to connect to sensors." << std::endl;
+    if (is_sensor_connected) {
+        std::cout << "[spinnaker stream] Listening to sensor data..." << std::endl;
+    } else {
+        std::cout << "[spinnaker stream] Sensor data not available." << std::endl;
     }
 
     while (true)
@@ -107,7 +94,6 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         // Print the pixel format only once
         if (!pixel_format_printed)
         {
-            std::cout << "[spinnaker stream] Captured pixel format: BayerRG8" << std::endl;
             std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
             pixel_format_printed = true;
@@ -119,11 +105,29 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
                                                         GetData());
 
         // Add components to the image
-        if (bridge.isValid())
+        if (is_sensor_connected)
         {
-            driver_line->update(str_whe_phi->get_value());
-            velocity->update(to_string(static_cast<int>(vel->get_value())));
-            stream_image->update(imageData, imageData);
+            static StreamImage stream_image(width, height);
+            static auto imageData_ = new unsigned char[width * height * 3];
+            static auto driver_line = make_shared<DriverLine>("fisheye_calibration.yaml", "homography_calibration.yaml");
+            static auto velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
+            static std::shared_mutex bufferMutex;
+            constexpr int buffer_size = 8192;
+            static auto buffer = new char[buffer_size];
+            static SensorAPI str_whe_phi(RemoteSteeringAngle, buffer, buffer_size, bufferMutex);
+            static SensorAPI vel(Velocity, buffer, buffer_size, bufferMutex);
+            static bool is_first = true;
+            if (is_first) {
+                std::thread t(receive_data_loop, bridge, buffer, buffer_size, std::ref(bufferMutex));
+                t.detach();
+                stream_image.add_component("driver_line", driver_line);
+                stream_image.add_component("velocity", velocity);
+                is_first = false;
+            }
+            driver_line->update(str_whe_phi.get_value());
+            velocity->update(to_string(static_cast<int>(vel.get_value())));
+            stream_image.update(imageData, imageData_);
+            imageData = imageData_;
         }
 
         // Convert RGB24 to YUYV422

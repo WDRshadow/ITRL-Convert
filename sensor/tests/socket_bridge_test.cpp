@@ -6,7 +6,7 @@
 #include "sensor.h"
 #include "udp_server.h"
 
-#define NUM_FLOATS 19
+#define NUM_FLOATS 25
 #define BUFFER_SIZE 8192
 #define PORT 10000
 #define IP_ADDRESS "0.0.0.0"

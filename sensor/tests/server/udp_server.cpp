@@ -11,7 +11,7 @@
 
 #define BROADCAST_IP "255.255.255.255"
 #define PORT 10000
-#define NUM_FLOATS 19
+#define NUM_FLOATS 25
 
 uint32_t float_to_big_endian(float f) {
     uint32_t temp;
