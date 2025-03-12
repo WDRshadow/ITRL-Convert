@@ -30,7 +30,8 @@ void StreamImage::update(Mat& imageData)
     }
 }
 
-Component::Component(const int cx, const int cy, const int width, const int height): cx(cx), cy(cy), width(width), height(height)
+Component::Component(const int cx, const int cy, const int width, const int height): cx(cx), cy(cy), width(width),
+    height(height)
 {
     img = make_shared<Mat>(Mat::zeros(height, width, CV_8UC3));
 }
@@ -42,9 +43,12 @@ shared_ptr<Mat> Component::get_img()
 
 void Component::reset_img() const
 {
-    if (!img->empty() && img->size() == Size(width, height) && img->type() == CV_8UC3) {
+    if (!img->empty() && img->size() == Size(width, height) && img->type() == CV_8UC3)
+    {
         img->setTo(Scalar(0, 0, 0));
-    } else {
+    }
+    else
+    {
         img->create(height, width, CV_8UC3);
         img->setTo(Scalar(0, 0, 0));
     }
@@ -61,35 +65,39 @@ int Component::get_center_y() const
     return cy;
 }
 
-DriverLine::DriverLine(const string& fisheye_config, const string& homography_config):
-    fisheye_camera(Fisheye(fisheye_config)), homography_line(Homography(homography_config))
+DriverLine::DriverLine(const string& fisheye_config, const string& homography_config, const int width,
+                       const int height): width(width), height(height), lines_({}),
+                                          fisheye_camera(Fisheye(fisheye_config)),
+                                          homography_line(Homography(homography_config))
 {
 }
 
 void DriverLine::update(const float str_whe_phi)
 {
     const float angle = str_whe_phi / 4.1f;
-    const vector<Point2f> line_left = create_curve(Point2f(1511, 2047), Point2f(1511, 1663), Point2f(1511 + 125 * tan(angle), 1280), 300);
-    const vector<Point2f> line_right = create_curve(Point2f(1561, 2047), Point2f(1561, 1663), Point2f(1561 + 125 * tan(angle), 1280), 300);
+    const vector<Point2f> line_left = create_curve(Point2f(1511, 2047), Point2f(1511, 1663),
+                                                   Point2f(1511 + 125 * tan(angle), 1280), 300);
+    const vector<Point2f> line_right = create_curve(Point2f(1561, 2047), Point2f(1561, 1663),
+                                                    Point2f(1561 + 125 * tan(angle), 1280), 300);
     vector<Point2f> lines = line_left;
     lines.insert(lines.end(), line_right.begin(), line_right.end());
     homography_line.projectPoints(lines, lines_);
-    fisheye_camera.distortPoints(lines_, _lines_);
+    fisheye_camera.distortPoints(lines_, lines_);
 }
 
-void DriverLine::operator>>(unsigned char* imageData)
+void DriverLine::operator>>(unsigned char* imageData) const
 {
-    Mat img(2048, 2048, CV_8UC3, const_cast<unsigned char*>(imageData));
-    img += _lines_;
-    imageData = img.data;
+    Mat img(height, width, CV_8UC3, imageData);
+    img += lines_;
 }
 
-void DriverLine::operator>>(Mat& imageData)
+void DriverLine::operator>>(Mat& imageData) const
 {
-    imageData += _lines_;
+    imageData += lines_;
 }
 
-TextComponent::TextComponent(const int x, const int y, const int width, const int height): Component(x, y, width, height)
+TextComponent::TextComponent(const int x, const int y, const int width, const int height): Component(
+    x, y, width, height)
 {
 }
 
@@ -104,4 +112,3 @@ void TextComponent::update(const unordered_map<string, string>& arg)
 {
     update(arg.find("text")->second);
 }
-

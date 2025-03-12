@@ -20,13 +20,13 @@ int main()
     const demo_sensor str_whe_phi("data/str_whe_phi.csv");
     const demo_sensor vel("data/vel.csv");
 
-    const auto interpolation_51_100 = [](int x) -> int
+    const auto interpolation_51_100 = [](const int x) -> int
     {
         return (x * 100 + 50) / 51;
     };
 
     StreamImage stream_image(3072, 2048);
-    DriverLine driver_line("data/fisheye_calibration.yaml", "data/homography_calibration.yaml");
+    DriverLine driver_line("data/fisheye_calibration.yaml", "data/homography_calibration.yaml", 3072, 2048);
     const auto velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
     stream_image.add_component("velocity", velocity);
 

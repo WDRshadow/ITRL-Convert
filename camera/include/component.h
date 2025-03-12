@@ -48,16 +48,17 @@ public:
 
 class DriverLine
 {
+    const int width;
+    const int height;
     vector<Point2f> lines_;
-    vector<Point2f> _lines_;
     const Fisheye fisheye_camera;
     const Homography homography_line;
 
 public:
-    DriverLine(const string& fisheye_config, const string& homography_config);
+    DriverLine(const string& fisheye_config, const string& homography_config, int width, int height);
     void update(float str_whe_phi);
-    void operator>>(unsigned char* imageData);
-    void operator>>(Mat& imageData);
+    void operator>>(unsigned char* imageData) const;
+    void operator>>(Mat& imageData) const;
 };
 
 class TextComponent final : public Component
