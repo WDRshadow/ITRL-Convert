@@ -8,8 +8,8 @@
 #include "homography.h"
 
 #define DEFAULT_VIDEO_DEVICE "/dev/video16"
-#define DEFAULT_IP "192.168.1.121"
-#define DEFAULT_PORT 10000
+#define DEFAULT_IP "0.0.0.0"
+#define DEFAULT_PORT 10086
 
 void run_spinnaker_stream(const char* videoDevice, const char* ip, int port) {
     std::cout << "[main] Starting to capture frames from the FLIR camera..." << std::endl;

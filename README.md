@@ -32,12 +32,11 @@ Once the video stream is running, you can use FleetMQ to stream the video to the
 You can also run the binary with the following parameters (default):
 - `-dev <device>` to specify the video device (`/dev/video16`)
 - `-s` to add the sensor data to the video stream (`false`)
-- `-ip <ip>` to bind the IP address of the sensor data (`192.168.1.121`)
-- `-p <port>` to bind the UDP port of the sensor data (`10000`)
+- `-ip <ip>` to bind the IP address of the sensor data (`0.0.0.0`)
+- `-p <port>` to bind the UDP port of the sensor data (`10086`)
 - `-fc` to calibrate the fisheye camera
 - `-fu <image>` to undistort the image
 - `-hc` to calibrate the homography matrix
-
 
 # Components with sensor data
 
@@ -85,12 +84,3 @@ The conversion is implemented using sequential processing, parallel processing, 
 
 
     Note: The points should be the pixel coordinates from a undistorted image.
-
-# Demo
-
-Once you build the binary, you can run the demo by running the following command in the `build/demo` directory:
-```bash
-./demo
-```
-
->Note: You will need to save the fisheye and homography matrix as well as the sensor data and the demo video file in the `build/demo/data` folder.

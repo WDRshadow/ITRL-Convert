@@ -18,15 +18,6 @@ SocketBridge::SocketBridge(const std::string &ip, int port)
         return;
     }
 
-    int optval = 1;
-    if (setsockopt(sockfd_, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval)) < 0)
-    {
-        std::cerr << "[socket bridge] setsockopt(SO_REUSEPORT) failed." << std::endl;
-        close(sockfd_);
-        sockfd_ = -1;
-        return;
-    }
-
     std::memset(&localAddr_, 0, sizeof(localAddr_));
     localAddr_.sin_family = AF_INET;
     localAddr_.sin_addr.s_addr = inet_addr(ip.c_str());
