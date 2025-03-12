@@ -65,6 +65,19 @@ std::unordered_map<std::string, std::string> parseArguments(int argc, char* argv
 int main(int argc, char* argv[]) {
     auto args = parseArguments(argc, argv);
 
+    if (args.find("-h") != args.end()) {
+        std::cout << "[main] Usage: " << argv[0] << " [-d <video_device>] [-s [-ip <ip>] [-p <port>]]" << std::endl;
+        std::cout << "[main] Options:" << std::endl;
+        std::cout << "[main]   -d <video_device>    Specify the video device to capture frames from (default: /dev/video16)" << std::endl;
+        std::cout << "[main]   -s                   Enable streaming mode" << std::endl;
+        std::cout << "[main]   -ip <ip>             Specify the IP address to stream frames to (default: 0.0.0.0)" << std::endl;
+        std::cout << "[main]   -p <port>            Specify the port to stream frames to (default: 10086)" << std::endl;
+        std::cout << "[main]   -fc                  Run fisheye calibration" << std::endl;
+        std::cout << "[main]   -fu <image>          Run fisheye undistortion on the specified image" << std::endl;
+        std::cout << "[main]   -hc                  Run homography calibration" << std::endl;
+        return 0;
+    }
+
     if (args.find("-fc") != args.end()) {
         run_fc();
         return 0;
@@ -73,7 +86,7 @@ int main(int argc, char* argv[]) {
     if (args.find("-fu") != args.end()) {
         const std::string filename = args["-fu"];
         if (filename.empty()) {
-            std::cerr << "[main] Usage: " << argv[0] << " <image>" << std::endl;
+            std::cerr << "[main] Usage: " << argv[0] << " -fu <image>" << std::endl;
             return -1;
         }
         run_fu(args["-fu"]);
@@ -86,8 +99,8 @@ int main(int argc, char* argv[]) {
     }
 
     const char* videoDevice;
-    if (args.find("-dev") != args.end()) {
-        videoDevice = args["-dev"].c_str();
+    if (args.find("-d") != args.end()) {
+        videoDevice = args["-d"].c_str();
     } else {
         videoDevice = DEFAULT_VIDEO_DEVICE;
     }
