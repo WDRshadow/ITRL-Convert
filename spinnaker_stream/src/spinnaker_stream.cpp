@@ -12,7 +12,6 @@
 #include "socket_bridge.h"
 #include "sensor.h"
 
-extern "C" {
 int configure_video_device(int video_fd, int width, int height)
 {
     struct v4l2_format vfmt = {};
@@ -82,7 +81,6 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
 
     while (true)
     {
-        auto start = std::chrono::high_resolution_clock::now();
         static Spinnaker::ImagePtr pImage = nullptr;
 
         pImage = camera->GetNextImage();
@@ -113,7 +111,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         if (is_sensor_connected)
         {
             static StreamImage stream_image(width, height);
-            static DriverLine driver_line("fisheye_calibration.yaml", "homography_calibration.yaml");
+            static DriverLine driver_line("fisheye_calibration.yaml", "homography_calibration.yaml", width, height);
             static auto velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
             static std::shared_mutex bufferMutex;
             constexpr int buffer_size = 8192;
@@ -156,10 +154,6 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         }
 
         pImage->Release();
-
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
-        std::cout << "[spinnaker stream] Frame rate: " << 1.0 /  elapsed.count() << " fps" << std::endl;
     }
 
     cleanup_cuda_buffers();
@@ -169,5 +163,4 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     system->ReleaseInstance();
 
     close(video_fd);
-}
 }

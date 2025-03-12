@@ -9,7 +9,7 @@ link_libraries(Spinnaker)
 
 add_subdirectory(spinnaker_stream)
 add_subdirectory(camera)
-add_subdirectory(rgb2yuyv)
+add_subdirectory(cuda)
 add_subdirectory(sensor)
 add_subdirectory(demo)
 
@@ -20,4 +20,4 @@ target_include_directories(rcve_stream
         ${OpenCV_INCLUDE_DIRS}
 )
 
-target_link_libraries(rcve_stream ${OpenCV_LIBS} spinnaker_stream sensor rgb2yuyv camera Spinnaker)
+target_link_libraries(rcve_stream ${OpenCV_LIBS} spinnaker_stream sensor cuda camera Spinnaker)

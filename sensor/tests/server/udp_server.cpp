@@ -62,7 +62,8 @@ void start_server() {
     while (true) {
         uint32_t buffer[NUM_FLOATS];
         for (int i = 0; i < NUM_FLOATS; i++) {
-            auto f = static_cast<float>(i);
+            // random float values between 0 and 1
+            float f = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
             buffer[i] = float_to_big_endian(f);
         }
 
@@ -72,6 +73,6 @@ void start_server() {
             perror("[udp server] sendto failed");
         }
 
-        sleep(1);
+        usleep(10000); // 10 ms
     }
 }
