@@ -64,7 +64,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
 
     // Initialize Streaming Component
     bool is_sensor_connected = false;
-    SocketBridge* bridge;
+    SocketBridge* bridge = nullptr;
     if (port != -1)
     {
         bridge = new SocketBridge(ip, port);
@@ -73,11 +73,16 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     if (is_sensor_connected) {
         std::cout << "[spinnaker stream] Listening to sensor data..." << std::endl;
     } else {
+        if (bridge != nullptr) {
+            delete bridge;
+            bridge = nullptr;
+        }
         std::cout << "[spinnaker stream] Sensor data not available." << std::endl;
     }
 
     while (true)
     {
+        auto start = std::chrono::high_resolution_clock::now();
         static Spinnaker::ImagePtr pImage = nullptr;
 
         pImage = camera->GetNextImage();
@@ -108,8 +113,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         if (is_sensor_connected)
         {
             static StreamImage stream_image(width, height);
-            static auto imageData_ = new unsigned char[width * height * 3];
-            static auto driver_line = make_shared<DriverLine>("fisheye_calibration.yaml", "homography_calibration.yaml");
+            static DriverLine driver_line("fisheye_calibration.yaml", "homography_calibration.yaml");
             static auto velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
             static std::shared_mutex bufferMutex;
             constexpr int buffer_size = 8192;
@@ -120,14 +124,13 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
             if (is_first) {
                 std::thread t(receive_data_loop, bridge, buffer, buffer_size, std::ref(bufferMutex));
                 t.detach();
-                stream_image.add_component("driver_line", driver_line);
                 stream_image.add_component("velocity", velocity);
                 is_first = false;
             }
-            driver_line->update(str_whe_phi.get_value());
+            driver_line.update(str_whe_phi.get_value());
+            driver_line >> imageData;
             velocity->update(to_string(static_cast<int>(vel.get_value())));
-            stream_image.update(imageData, imageData_);
-            imageData = imageData_;
+            stream_image.update(imageData);
         }
 
         // Convert RGB24 to YUYV422
@@ -153,6 +156,10 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         }
 
         pImage->Release();
+
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        std::cout << "[spinnaker stream] Frame rate: " << 1.0 /  elapsed.count() << " fps" << std::endl;
     }
 
     cleanup_cuda_buffers();

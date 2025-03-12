@@ -13,14 +13,13 @@ void StreamImage::add_component(const string& name, const shared_ptr<Component>&
     components.emplace(name, component);
 }
 
-void StreamImage::update(const unsigned char* imageData, unsigned char* output)
+void StreamImage::update(const unsigned char* imageData)
 {
     Mat img(height, width, CV_8UC3, const_cast<unsigned char*>(imageData));
     for (const auto& [str, component] : components)
     {
         overlay_image(img, Point(component->get_center_x(), component->get_center_y()), *component->get_img());
     }
-    memcpy(output, img.data, width * height * 3);
 }
 
 void StreamImage::update(Mat& imageData)
@@ -63,14 +62,12 @@ int Component::get_center_y() const
 }
 
 DriverLine::DriverLine(const string& fisheye_config, const string& homography_config):
-    Component(1536, 1024, 3072, 2048), fisheye_camera(Fisheye(fisheye_config)),
-    homography_line(Homography(homography_config))
+    fisheye_camera(Fisheye(fisheye_config)), homography_line(Homography(homography_config))
 {
 }
 
 void DriverLine::update(const float str_whe_phi)
 {
-    reset_img();
     const float angle = str_whe_phi / 4.1f;
     const vector<Point2f> line_left = create_curve(Point2f(1511, 2047), Point2f(1511, 1663), Point2f(1511 + 125 * tan(angle), 1280), 300);
     const vector<Point2f> line_right = create_curve(Point2f(1561, 2047), Point2f(1561, 1663), Point2f(1561 + 125 * tan(angle), 1280), 300);
@@ -78,13 +75,18 @@ void DriverLine::update(const float str_whe_phi)
     lines.insert(lines.end(), line_right.begin(), line_right.end());
     homography_line.projectPoints(lines, lines_);
     fisheye_camera.distortPoints(lines_, _lines_);
-    *img += _lines_;
 }
 
-void DriverLine::update(const unordered_map<string, string>& arg)
+void DriverLine::operator>>(unsigned char* imageData)
 {
-    reset_img();
-    update(stof(arg.find("str_whe_phi")->second));
+    Mat img(2048, 2048, CV_8UC3, const_cast<unsigned char*>(imageData));
+    img += _lines_;
+    imageData = img.data;
+}
+
+void DriverLine::operator>>(Mat& imageData)
+{
+    imageData += _lines_;
 }
 
 TextComponent::TextComponent(const int x, const int y, const int width, const int height): Component(x, y, width, height)

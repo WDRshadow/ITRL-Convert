@@ -7,6 +7,10 @@
 #include "fisheye.h"
 #include "homography.h"
 
+#define DEFAULT_VIDEO_DEVICE "/dev/video16"
+#define DEFAULT_IP "192.168.1.121"
+#define DEFAULT_PORT 10000
+
 void run_spinnaker_stream(const char* videoDevice, const char* ip, int port) {
     std::cout << "[main] Starting to capture frames from the FLIR camera..." << std::endl;
     capture_frames(videoDevice, ip, port);
@@ -85,7 +89,7 @@ int main(int argc, char* argv[]) {
     if (args.find("-dev") != args.end()) {
         videoDevice = args["-dev"].c_str();
     } else {
-        videoDevice = "/dev/video16";
+        videoDevice = DEFAULT_VIDEO_DEVICE;
     }
     std::cout << "[main] Using video device: " << videoDevice << std::endl;
 
@@ -95,12 +99,12 @@ int main(int argc, char* argv[]) {
         if (args.find("-ip") != args.end()) {
             ip = args["-ip"].c_str();
         } else {
-            ip = "192.168.1.121";
+            ip = DEFAULT_IP;
         }
         if (args.find("-p") != args.end()) {
             port = std::stoi(args["-p"]);
         } else {
-            port = 10000;
+            port = DEFAULT_PORT;
         }
         std::cout << "[main] Using IP: " << ip << " and port: " << port << std::endl;
     } else {

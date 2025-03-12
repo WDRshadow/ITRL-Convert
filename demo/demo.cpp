@@ -26,10 +26,8 @@ int main()
     };
 
     StreamImage stream_image(3072, 2048);
-    const auto driver_line = make_shared<DriverLine>("data/fisheye_calibration.yaml",
-                                                     "data/homography_calibration.yaml");
+    DriverLine driver_line("data/fisheye_calibration.yaml", "data/homography_calibration.yaml");
     const auto velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
-    stream_image.add_component("driver_line", driver_line);
     stream_image.add_component("velocity", velocity);
 
     cap.set(CAP_PROP_POS_FRAMES, 8000);
@@ -48,7 +46,8 @@ int main()
             break;
         }
         // component update -----------------------------------
-        driver_line->update(str_whe_phi.get_value(start + index));
+        driver_line.update(str_whe_phi.get_value(start + index));
+        driver_line >> frame;
         velocity->update(to_string(static_cast<int>(vel.get_value(start + index))));
         stream_image.update(frame);
         // ----------------------------------------------------

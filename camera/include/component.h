@@ -21,7 +21,7 @@ class StreamImage
 public:
     StreamImage(int width, int height);
     void add_component(const string& name, const shared_ptr<Component>& component);
-    void update(const unsigned char* imageData, unsigned char* output);
+    void update(const unsigned char* imageData);
     void update(Mat& imageData);
 };
 
@@ -46,7 +46,7 @@ public:
     [[nodiscard]] int get_center_y() const;
 };
 
-class DriverLine final : public Component
+class DriverLine
 {
     vector<Point2f> lines_;
     vector<Point2f> _lines_;
@@ -56,7 +56,8 @@ class DriverLine final : public Component
 public:
     DriverLine(const string& fisheye_config, const string& homography_config);
     void update(float str_whe_phi);
-    void update(const unordered_map<string, string>& arg) override;
+    void operator>>(unsigned char* imageData);
+    void operator>>(Mat& imageData);
 };
 
 class TextComponent final : public Component
