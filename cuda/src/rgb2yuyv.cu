@@ -7,15 +7,18 @@
 #define Y_G 33024 // 129 * 256
 #define Y_B 6400  // 25 * 256
 
-#define U_R -9728 // -38 * 256
+#define U_R -9728  // -38 * 256
 #define U_G -18944 // -74 * 256
-#define U_B 28672 // 112 * 256
+#define U_B 28672  // 112 * 256
 
 #define V_R 28672  // 112 * 256
 #define V_G -24064 // -94 * 256
 #define V_B -4608  // -18 * 256
 
 #define CLAMP(x) ((x) < 0 ? 0 : ((x) > 255 ? 255 : x))
+
+unsigned char *d_rgb24 = nullptr;
+unsigned char *d_yuyv422 = nullptr;
 
 __global__ void convert_rgb24_to_yuyv_cuda_kernel(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height)
 {
@@ -48,35 +51,42 @@ __global__ void convert_rgb24_to_yuyv_cuda_kernel(const unsigned char *rgb24, un
 
 void convert_rgb24_to_yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height)
 {
-    static unsigned char *d_rgb24 = nullptr;
-    static unsigned char *d_yuyv422 = nullptr;
-    size_t size_rgb24 = width * height * 3 * sizeof(unsigned char);
-    size_t size_yuyv422 = width * height * 2 * sizeof(unsigned char);
-
-    if (d_rgb24 == nullptr)
+    static size_t size_rgb24 = width * height * 3 * sizeof(unsigned char);
+    static size_t size_yuyv422 = width * height * 2 * sizeof(unsigned char);
+    static dim3 blockSize(32, 16);
+    static dim3 gridSize((width / 2 + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
+    if (d_rgb24 == nullptr || d_yuyv422 == nullptr)
     {
         cudaMalloc((void **)&d_rgb24, size_rgb24);
         cudaMalloc((void **)&d_yuyv422, size_yuyv422);
     }
-    cudaMemcpy(d_rgb24, rgb24, size_rgb24, cudaMemcpyHostToDevice);
-
-    // This can be changed to a more optimal block size depending on the data size
-    dim3 blockSize(32, 16);
-    dim3 gridSize((width / 2 + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
-
+    cudaMemcpy(d_rgb24, rgb24, width * height * 3, cudaMemcpyHostToDevice);
     convert_rgb24_to_yuyv_cuda_kernel<<<gridSize, blockSize>>>(d_rgb24, d_yuyv422, width, height);
     cudaMemcpy(yuyv422, d_yuyv422, size_yuyv422, cudaMemcpyDeviceToHost);
 }
 
 void cleanup_cuda_buffers()
 {
-    static unsigned char *d_rgb24 = nullptr;
-    static unsigned char *d_yuyv422 = nullptr;
-    if (d_rgb24)
+    if (d_rgb24 != nullptr)
     {
         cudaFree(d_rgb24);
-        cudaFree(d_yuyv422);
         d_rgb24 = nullptr;
+    }
+    if (d_yuyv422 != nullptr) 
+    {
+        cudaFree(d_yuyv422);
         d_yuyv422 = nullptr;
     }
+}
+
+unsigned char *get_cuda_buffer(size_t size) 
+{
+    unsigned char *h_pinned = nullptr;
+    cudaMallocHost((void **)&h_pinned, size);
+    return h_pinned;
+}
+
+void free_cuda_buffer(unsigned char *h_pinned) 
+{
+    cudaFreeHost(h_pinned);
 }

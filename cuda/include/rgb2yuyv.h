@@ -28,6 +28,19 @@ extern "C"
      */
     void cleanup_cuda_buffers();
 
+    /**
+     * Use cudaHostAlloc to allocate a pinned memory buffer.
+     *
+     * @param size Size of the buffer
+     * @return Pointer to the buffer
+     */
+    unsigned char *get_cuda_buffer(size_t size);
+
+    /**
+     * Free the CUDA buffer.
+     */
+    void free_cuda_buffer(unsigned char *buffer);
+
 #ifdef __cplusplus
 }
 #endif

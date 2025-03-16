@@ -45,20 +45,13 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     // Initialize Spinnaker
     Spinnaker::SystemPtr system = Spinnaker::System::GetInstance();
     Spinnaker::CameraList camList = system->GetCameras();
-
     if (camList.GetSize() == 0)
     {
         std::cerr << "[spinnaker stream] No cameras detected!" << std::endl;
         return;
     }
-
     Spinnaker::CameraPtr camera = camList.GetByIndex(0);
     camera->Init();
-
-    bool pixel_format_printed = false;
-    bool is_configured = false;
-
-    // Start capturing images
     camera->BeginAcquisition();
 
     // Initialize Streaming Component
@@ -79,6 +72,11 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         std::cout << "[spinnaker stream] Sensor data not available." << std::endl;
     }
 
+
+    bool is_init = false;
+    unsigned char* yuyv422 = nullptr;
+    char* buffer = nullptr;
+
     while (true)
     {
         static Spinnaker::ImagePtr pImage = nullptr;
@@ -94,12 +92,17 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
             continue;
         }
 
-        // Print the pixel format only once
-        if (!pixel_format_printed)
+        // Print the pixel format only once and initialize the virtual device
+        if (!is_init)
         {
+            if (configure_video_device(video_fd, width, height) != 0)
+            {
+                std::cerr << "[spinnaker stream] Failed to configure virtual device" << std::endl;
+                break;
+            }
             std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
-            pixel_format_printed = true;
+            is_init = true;
         }
 
         // Handle BayerRG8 format: Convert BayerRG8 to RGB8
@@ -114,17 +117,17 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
             static DriverLine driver_line("fisheye_calibration.yaml", "homography_calibration.yaml", width, height);
             static auto velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
             static std::shared_mutex bufferMutex;
-            constexpr int buffer_size = 8192;
-            static auto buffer = new char[buffer_size];
-            static SensorAPI str_whe_phi(RemoteSteeringAngle, buffer, buffer_size, bufferMutex);
-            static SensorAPI vel(Velocity, buffer, buffer_size, bufferMutex);
             static bool is_first = true;
+            constexpr int buffer_size = 8192;
             if (is_first) {
+                buffer = new char[buffer_size];
                 std::thread t(receive_data_loop, bridge, buffer, buffer_size, std::ref(bufferMutex));
                 t.detach();
                 stream_image.add_component("velocity", velocity);
                 is_first = false;
             }
+            static SensorAPI str_whe_phi(RemoteSteeringAngle, buffer, buffer_size, bufferMutex);
+            static SensorAPI vel(Velocity, buffer, buffer_size, bufferMutex);
             driver_line.update(str_whe_phi.get_value());
             driver_line >> imageData;
             velocity->update(to_string(static_cast<int>(vel.get_value())));
@@ -132,19 +135,8 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         }
 
         // Convert RGB24 to YUYV422
-        static auto* yuyv422 = new unsigned char[width * height * 2];
+        yuyv422 = get_cuda_buffer(width * height * 2);
         convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
-
-        // Configure the virtual video device for YUYV422
-        if (!is_configured)
-        {
-            if (configure_video_device(video_fd, width, height) != 0)
-            {
-                std::cerr << "[spinnaker stream] Failed to configure virtual device" << std::endl;
-                break;
-            }
-            is_configured = true;
-        }
 
         // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
         if (write(video_fd, yuyv422, width * height * 2) == -1)
@@ -157,6 +149,18 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     }
 
     cleanup_cuda_buffers();
+    if (yuyv422 != nullptr)
+    {
+        free_cuda_buffer(yuyv422);
+    }
+    if (buffer != nullptr)
+    {
+        delete[] buffer;
+    }
+    if (bridge != nullptr)
+    {
+        delete bridge;
+    }
     camera->EndAcquisition();
     camera->DeInit();
     camList.Clear();
