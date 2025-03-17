@@ -67,14 +67,11 @@ void convert_rgb24_to_yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv4
 
 void cleanup_cuda_buffers()
 {
-    if (d_rgb24 != nullptr)
+    if (d_rgb24 != nullptr || d_yuyv422 != nullptr)
     {
         cudaFree(d_rgb24);
-        d_rgb24 = nullptr;
-    }
-    if (d_yuyv422 != nullptr) 
-    {
         cudaFree(d_yuyv422);
+        d_rgb24 = nullptr;
         d_yuyv422 = nullptr;
     }
 }
