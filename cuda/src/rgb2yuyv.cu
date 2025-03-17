@@ -55,7 +55,7 @@ void convert_rgb24_to_yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv4
     static size_t size_yuyv422 = width * height * 2 * sizeof(unsigned char);
     static dim3 blockSize(32, 16);
     static dim3 gridSize((width / 2 + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
-    if (d_rgb24 == nullptr || d_yuyv422 == nullptr)
+    if (d_rgb24 == nullptr)
     {
         cudaMalloc((void **)&d_rgb24, size_rgb24);
         cudaMalloc((void **)&d_yuyv422, size_yuyv422);
@@ -67,7 +67,7 @@ void convert_rgb24_to_yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv4
 
 void cleanup_cuda_buffers()
 {
-    if (d_rgb24 != nullptr || d_yuyv422 != nullptr)
+    if (d_rgb24)
     {
         cudaFree(d_rgb24);
         cudaFree(d_yuyv422);
@@ -85,5 +85,7 @@ unsigned char *get_cuda_buffer(size_t size)
 
 void free_cuda_buffer(unsigned char *h_pinned) 
 {
-    cudaFreeHost(h_pinned);
+    if (h_pinned) {
+        cudaFreeHost(h_pinned);
+    }
 }

@@ -12,12 +12,11 @@ class SocketBridge
 public:
     SocketBridge(const std::string &ip, int port);
     ~SocketBridge();
-    void discard();
     [[nodiscard]] bool isValid() const;
     ssize_t receiveData(char *buffer, size_t bufferSize) const;
 };
 
 void receive_data_loop(const SocketBridge *bridge, char *buffer, size_t bufferSize,
-                       std::shared_mutex &bufferMutex);
+                       std::shared_mutex &bufferMutex, bool &signal);
 
 #endif // SOCKET_BRIDGE_H

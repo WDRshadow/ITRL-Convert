@@ -39,7 +39,8 @@ TEST(SOCKET_BRIDGE, ASYNC)
     std::shared_mutex bufferMutex;
     char* buffer = new char[BUFFER_SIZE];
     SocketBridge bridge(IP_ADDRESS, PORT);
-    std::thread t(receive_data_loop, &bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex));
+    bool flag = true;
+    std::thread t(receive_data_loop, &bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex), std::ref(flag));
     t.detach();
     sleep(2);
     for (int i = 0; i < NUM_FLOATS; i++)
@@ -48,7 +49,7 @@ TEST(SOCKET_BRIDGE, ASYNC)
         float f = BigEndianToFloat(buffer + i * sizeof(float));
         EXPECT_EQ(f, i);
     }
-    bridge.discard();
+    flag = false;
 }
 
 TEST(SOCKET_BRIDGE, VELOCITY)
@@ -56,10 +57,11 @@ TEST(SOCKET_BRIDGE, VELOCITY)
     std::shared_mutex bufferMutex;
     char* buffer = new char[BUFFER_SIZE];
     SocketBridge bridge(IP_ADDRESS, PORT);
-    std::thread t(receive_data_loop, &bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex));
+    bool flag = true;
+    std::thread t(receive_data_loop, &bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex), std::ref(flag));
     t.detach();
     const SensorAPI sensor(Velocity, buffer, BUFFER_SIZE, bufferMutex);
     sleep(2);
     EXPECT_EQ(sensor.get_value(), 10);
-    bridge.discard();
+    flag = false;
 }
