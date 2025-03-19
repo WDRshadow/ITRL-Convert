@@ -3,6 +3,7 @@
 
 #include "component.h"
 #include "util.h"
+#include "cyra.h"
 
 StreamImage::StreamImage(const int width, const int height): components({}), width(width), height(height)
 {
@@ -65,10 +66,33 @@ int Component::get_center_y() const
     return cy;
 }
 
+LineComponent::LineComponent(const string& fisheye_config, const string& homography_config, const int width,
+                             const int height): width(width), height(height), lines_({}),
+                                                fisheye_camera(Fisheye(fisheye_config)),
+                                                homography_line(Homography(homography_config))
+{
+}
+
+void LineComponent::operator>>(unsigned char* imageData) const
+{
+    Mat img(height, width, CV_8UC3, imageData);
+    img += lines_;
+}
+
+void LineComponent::operator>>(Mat& imageData) const
+{
+    imageData += lines_;
+}
+
+void LineComponent::project(const vector<Point2f>& lines)
+{
+    homography_line.projectPoints(lines, lines_);
+    fisheye_camera.distortPoints(lines_, lines_);
+}
+
 DriverLine::DriverLine(const string& fisheye_config, const string& homography_config, const int width,
-                       const int height): width(width), height(height), lines_({}),
-                                          fisheye_camera(Fisheye(fisheye_config)),
-                                          homography_line(Homography(homography_config))
+                       const int height):
+    LineComponent(fisheye_config, homography_config, width, height)
 {
 }
 
@@ -81,20 +105,39 @@ void DriverLine::update(const float str_whe_phi)
                                                     Point2f(1561 + 125 * tan(angle), 1280), 300);
     vector<Point2f> lines = line_left;
     lines.insert(lines.end(), line_right.begin(), line_right.end());
-    homography_line.projectPoints(lines, lines_);
-    fisheye_camera.distortPoints(lines_, lines_);
+    project(lines);
 }
 
-void DriverLine::operator>>(unsigned char* imageData) const
+void DriverLine::update(const unordered_map<string, string>& arg)
 {
-    Mat img(height, width, CV_8UC3, imageData);
-    img += lines_;
+    update(std::stof(arg.find("str_whe_phi")->second));
 }
 
-void DriverLine::operator>>(Mat& imageData) const
+PredictionLine::PredictionLine(const string& fisheye_config, const string& homography_config, const int width,
+                               const int height):
+    LineComponent(fisheye_config, homography_config, width, height)
 {
-    imageData += lines_;
 }
+
+void PredictionLine::update(const float v, const float a, const float str_whe_phi, const float latency)
+{
+    const double omega = bycicleModel(v, str_whe_phi, RCVE_WHBASE, RCVE_RATIO);
+    State predicted = predictCYRA(v, a, omega, THETA0, latency);
+    const vector<Point2f> line = create_line({static_cast<float>(1536 + predicted.y * 25), static_cast<float>(2047 - predicted.x * 25)},
+                                             predicted.theta, 25, 50);
+    project(line);
+}
+
+void PredictionLine::update(const unordered_map<string, string>& arg)
+{
+    update(
+        std::stof(arg.find("v")->second),
+        std::stof(arg.find("a")->second),
+        std::stof(arg.find("str_whe_phi")->second),
+        std::stof(arg.find("latency")->second)
+    );
+}
+
 
 TextComponent::TextComponent(const int x, const int y, const int width, const int height): Component(
     x, y, width, height)

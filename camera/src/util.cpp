@@ -24,6 +24,23 @@ vector<Point2f> create_line(Point2f start, Point2f end, int num)
     return line;
 }
 
+vector<Point2f> create_line(Point2f center, double angle, double length, int half_num)
+{
+    vector<Point2f> line;
+    line.reserve(half_num * 2);
+    for (int i = 0; i < half_num; i++)
+    {
+        double x_l = center.x - length * cos(angle) * i / half_num;
+        double y_l = center.y - length * sin(angle) * i / half_num;
+        double x_r = center.x + length * cos(angle) * i / half_num;
+        double y_r = center.y + length * sin(angle) * i / half_num;
+        line.emplace_back(x_l, y_l);
+        line.emplace_back(x_r, y_r);
+    }
+    return line;
+}
+
+
 vector<Point2f> create_curve(Point2f start, Point2f control, Point2f end, int num)
 {
     vector<Point2f> curve;

@@ -46,19 +46,40 @@ public:
     [[nodiscard]] int get_center_y() const;
 };
 
-class DriverLine
+class LineComponent
 {
+protected:
     const int width;
     const int height;
     vector<Point2f> lines_;
     const Fisheye fisheye_camera;
     const Homography homography_line;
+    void project(const vector<Point2f>& lines);
+
+public:
+    LineComponent(const string& fisheye_config, const string& homography_config, int width, int height);
+    virtual ~LineComponent() = default;
+    virtual void update(const unordered_map<string, string>& arg) = 0;
+    void operator>>(unsigned char* imageData) const;
+    void operator>>(Mat& imageData) const;
+};
+
+class DriverLine : public LineComponent
+{
+    void update(const unordered_map<string, string>& arg) override;
 
 public:
     DriverLine(const string& fisheye_config, const string& homography_config, int width, int height);
     void update(float str_whe_phi);
-    void operator>>(unsigned char* imageData) const;
-    void operator>>(Mat& imageData) const;
+};
+
+class PredictionLine : public LineComponent
+{
+    void update(const unordered_map<string, string>& arg) override;
+
+public:
+    PredictionLine(const string& fisheye_config, const string& homography_config, int width, int height);
+    void update(float v, float a, float str_whe_phi, float latency);
 };
 
 class TextComponent final : public Component

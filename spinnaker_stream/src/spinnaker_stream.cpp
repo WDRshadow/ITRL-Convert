@@ -110,10 +110,12 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     // Define the smart pointer objects
     std::unique_ptr<StreamImage> stream_image;
     std::shared_ptr<DriverLine> driver_line;
+    std::shared_ptr<PredictionLine> prediction_line;
     std::shared_ptr<TextComponent> velocity;
     std::shared_mutex bufferMutex;
     std::unique_ptr<SensorAPI> str_whe_phi;
     std::unique_ptr<SensorAPI> vel;
+    std::unique_ptr<SensorAPI> ax;
 
     // Initialize Streaming Component
     bool is_sensor_connected = false;
@@ -175,9 +177,11 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 buffer = new char[buffer_size];
                 stream_image = std::make_unique<StreamImage>(width, height);
                 driver_line = std::make_shared<DriverLine>("fisheye_calibration.yaml", "homography_calibration.yaml", width, height);
+                prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml", "homography_calibration.yaml", width, height);
                 velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
                 str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, buffer_size, bufferMutex);
                 vel = std::make_unique<SensorAPI>(Velocity, buffer, buffer_size, bufferMutex);
+                ax = std::make_unique<SensorAPI>(AX, buffer, buffer_size, bufferMutex);
                 is_thread_running = true;
                 sensor_thread = std::thread(receive_data_loop, bridge, buffer, buffer_size, std::ref(bufferMutex), std::ref(is_thread_running));
                 stream_image->add_component("velocity", velocity);
@@ -185,6 +189,8 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             }
             driver_line->update(str_whe_phi->get_value());
             *driver_line >> imageData;
+            prediction_line->update(vel->get_value(), ax->get_value(), str_whe_phi->get_value(), 0.1);
+            *prediction_line >> imageData;
             velocity->update(to_string(static_cast<int>(vel->get_value())));
             stream_image->update(imageData);
         }

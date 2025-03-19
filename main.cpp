@@ -49,7 +49,7 @@ std::unordered_map<std::string, std::string> parseArguments(int argc, char* argv
 
     for (int i = 1; i < argc; ++i) {
         std::string key = argv[i];
-        if (key.rfind("-", 0) == 0) {
+        if (key.rfind('-', 0) == 0) {
             if (i + 1 < argc && argv[i + 1][0] != '-') {  
                 args[key] = argv[i + 1];
                 ++i;

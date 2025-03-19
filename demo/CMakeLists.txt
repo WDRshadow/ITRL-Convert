@@ -20,4 +20,4 @@ set_target_properties(demo PROPERTIES
         POSITION_INDEPENDENT_CODE ON
 )
 
-target_link_libraries(demo ${OpenCV_LIBS} camera)
+target_link_libraries(demo ${OpenCV_LIBS} camera motion)
