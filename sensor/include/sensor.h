@@ -40,8 +40,6 @@ public:
     [[nodiscard]] float get_value() const;
 };
 
-uint32_t BigEndianToUint32(const char* bytes);
-float BigEndianToFloat(const char* bytes);
-
+float getFloatAt(const char* buffer, int id);
 
 #endif //SENSOR_H

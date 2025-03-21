@@ -17,25 +17,15 @@ float SensorAPI::get_value() const
     std::shared_lock lock(bufferMutex);
     std::memcpy(local_buffer, buffer, buffer_size * sizeof(char));
     lock.unlock();
-    if (id == IncPkgNr)
-    {
-        return static_cast<float>(BigEndianToUint32(local_buffer + id * sizeof(float)));
-    }
-    return BigEndianToFloat(local_buffer + id * sizeof(float));
+    return getFloatAt(local_buffer, id);
 }
 
-uint32_t BigEndianToUint32(const char* bytes)
+float getFloatAt(const char* buffer, const int id)
 {
-    return static_cast<uint32_t>(static_cast<unsigned char>(bytes[0])) << 24 |
-        static_cast<uint32_t>(static_cast<unsigned char>(bytes[1])) << 16 |
-        static_cast<uint32_t>(static_cast<unsigned char>(bytes[2])) << 8 |
-        static_cast<uint32_t>(static_cast<unsigned char>(bytes[3])) << 0;
-}
+    if (id < 0 || id >= 25)
+        throw std::out_of_range("[sensor] Invalid index.");
 
-float BigEndianToFloat(const char* bytes)
-{
-    uint32_t tmp = BigEndianToUint32(bytes);
-    float f;
-    std::memcpy(&f, &tmp, sizeof(f));
-    return f;
+    float value;
+    std::memcpy(&value, buffer + id * sizeof(float), sizeof(float));
+    return value;
 }

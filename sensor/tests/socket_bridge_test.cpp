@@ -8,7 +8,7 @@
 
 #define NUM_FLOATS 25
 #define BUFFER_SIZE 8192
-#define PORT 10000
+#define PORT 10086
 #define IP_ADDRESS "0.0.0.0"
 
 int main(int argc, char **argv)
@@ -29,7 +29,7 @@ TEST(SOCKET_BRIDGE, RECEIVE)
     socket.receiveData(buffer, BUFFER_SIZE);
     for (int i = 0; i < NUM_FLOATS; i++)
     {
-        float f = BigEndianToFloat(buffer + i * sizeof(float));
+        float f = getFloatAt(buffer, i);
         EXPECT_EQ(f, i);
     }
 }
@@ -46,10 +46,11 @@ TEST(SOCKET_BRIDGE, ASYNC)
     for (int i = 0; i < NUM_FLOATS; i++)
     {
         std::shared_lock lock(bufferMutex);
-        float f = BigEndianToFloat(buffer + i * sizeof(float));
+        float f = getFloatAt(buffer, i);
         EXPECT_EQ(f, i);
     }
     flag = false;
+    sleep(2);
 }
 
 TEST(SOCKET_BRIDGE, VELOCITY)
@@ -64,4 +65,5 @@ TEST(SOCKET_BRIDGE, VELOCITY)
     sleep(2);
     EXPECT_EQ(sensor.get_value(), 10);
     flag = false;
+    sleep(2);
 }

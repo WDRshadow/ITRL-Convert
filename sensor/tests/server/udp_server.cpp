@@ -10,14 +10,8 @@
 #include "udp_server.h"
 
 #define BROADCAST_IP "255.255.255.255"
-#define PORT 10000
+#define PORT 10086
 #define NUM_FLOATS 25
-
-uint32_t float_to_big_endian(float f) {
-    uint32_t temp;
-    std::memcpy(&temp, &f, sizeof(float));
-    return htonl(temp);
-}
 
 void start_server() {
     const int sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -60,11 +54,10 @@ void start_server() {
     std::cout << "[udp server] Broadcasting data to " << BROADCAST_IP << std::endl;
 
     while (true) {
-        uint32_t buffer[NUM_FLOATS];
+        float buffer[NUM_FLOATS];
+
         for (int i = 0; i < NUM_FLOATS; i++) {
-            // random float values between 0 and 1
-            float f = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-            buffer[i] = float_to_big_endian(f);
+            buffer[i] = static_cast<float>(i);
         }
 
         ssize_t sentBytes = sendto(sock, buffer, sizeof(buffer), 0,
