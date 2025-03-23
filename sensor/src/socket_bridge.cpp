@@ -67,14 +67,16 @@ ssize_t SocketBridge::receiveData(char *buffer, const size_t bufferSize) const
 }
 
 void receive_data_loop(const SocketBridge *bridge, char *buffer, const size_t bufferSize,
-                       std::shared_mutex &bufferMutex, bool &signal)
+                       std::shared_mutex &bufferMutex, bool &signal, bool &isRunning)
 {
+    isRunning = true;
     auto localBuffer = new char[bufferSize];
-    while (signal && bridge && bridge->isValid())
+    while (!signal && bridge && bridge->isValid())
     {
         bridge->receiveData(localBuffer, bufferSize);
         std::lock_guard lock(bufferMutex);
         std::memcpy(buffer, localBuffer, bufferSize);
     }
     delete[] localBuffer;
+    isRunning = false;
 }

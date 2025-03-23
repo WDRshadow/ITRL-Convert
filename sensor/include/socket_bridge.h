@@ -17,6 +17,6 @@ public:
 };
 
 void receive_data_loop(const SocketBridge *bridge, char *buffer, size_t bufferSize,
-                       std::shared_mutex &bufferMutex, bool &signal);
+                       std::shared_mutex &bufferMutex, bool &signal, bool &isRunning);
 
 #endif // SOCKET_BRIDGE_H

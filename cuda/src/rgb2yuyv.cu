@@ -21,6 +21,14 @@ unsigned char *d_rgb24 = nullptr;
 unsigned char *d_yuyv422 = nullptr;
 cudaStream_t *streams = nullptr;
 bool is_cuda_initialized = false;
+size_t size_rgb24;
+size_t size_yuyv422;
+int block_height;
+size_t size_rgb24_block;
+size_t size_yuyv422_block;
+
+const dim3 blockSize(32, 16);
+dim3 gridSize;
 
 __global__ void rgb2yuyv_kernel(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height)
 {
@@ -53,17 +61,15 @@ __global__ void rgb2yuyv_kernel(const unsigned char *rgb24, unsigned char *yuyv4
 
 void rgb2yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height, int stream_num)
 {
-    static const size_t size_rgb24 = width * height * 3 * sizeof(unsigned char);
-    static const size_t size_yuyv422 = width * height * 2 * sizeof(unsigned char);
-    static const int block_height = height / stream_num;
-    static const size_t size_rgb24_block = width * block_height * 3 * sizeof(unsigned char);
-    static const size_t size_yuyv422_block = width * block_height * 2 * sizeof(unsigned char);
-
-    static const dim3 blockSize(32, 16);
-    static const dim3 gridSize((width / 2 + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
 
     if (!is_cuda_initialized)
     {
+        size_rgb24 = width * height * 3 * sizeof(unsigned char);
+        size_yuyv422 = width * height * 2 * sizeof(unsigned char);
+        block_height = height / stream_num;
+        size_rgb24_block = width * block_height * 3 * sizeof(unsigned char);
+        size_yuyv422_block = width * block_height * 2 * sizeof(unsigned char);
+        gridSize = dim3((width / 2 + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
         streams = (cudaStream_t *)malloc(stream_num * sizeof(cudaStream_t));
         for (int i = 0; i < stream_num; i++)
         {

@@ -13,6 +13,7 @@
 #include "socket_bridge.h"
 #include "sensor.h"
 
+#define BUFFER_SIZE 8192
 #define CUDA_STREAMS 8
 
 bool is_init = false;
@@ -24,6 +25,7 @@ Spinnaker::ImagePtr pImage = nullptr;
 SocketBridge *bridge = nullptr;
 char *buffer = nullptr;
 bool is_sensor_init = false;
+bool thread_signal = false;
 bool is_thread_running = false;
 unsigned char *imageData = nullptr;
 unsigned char *yuyv422 = nullptr;
@@ -33,26 +35,43 @@ void cleanup_stream()
 {
     if (is_sensor_init)
     {
-        is_thread_running = false;
+        thread_signal = true;
+        if (sensor_thread.joinable())
+        {
+            int count = 0;
+            while (is_thread_running && count++ < 30)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            if (is_thread_running)
+            {
+                std::cerr << "[spinnaker stream] Sensor thread did not exit gracefully" << std::endl;
+                sensor_thread.detach();
+            } else {
+                sensor_thread.join();
+            }
+        }
+        thread_signal = false;
         delete[] buffer;
         buffer = nullptr;
         delete bridge;
         bridge = nullptr;
+        is_sensor_init = false;
     }
     if (is_init)
     {
         imageData = nullptr;
         free_cuda_buffer(yuyv422);
         cleanup_cuda_buffers(CUDA_STREAMS);
+        is_init = false;
     }
-    if (pImage.IsValid())
-    {
-        pImage->Release();
-    }
+    pImage = nullptr;
     camera->EndAcquisition();
     camera->DeInit();
+    camera = nullptr;
     camList.Clear();
     system_c->ReleaseInstance();
+    system_c = nullptr;
     close(video_fd);
 }
 
@@ -140,12 +159,12 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         std::cout << "[spinnaker stream] Sensor data not available." << std::endl;
     }
 
+    unsigned int width;
+    unsigned int height;
+
     while (true)
     {
         pImage = camera->GetNextImage();
-
-        static unsigned int width = pImage->GetWidth();
-        static unsigned int height = pImage->GetHeight();
 
         if (pImage->IsIncomplete())
         {
@@ -156,6 +175,8 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         // Print the pixel format only once and initialize the virtual device
         if (!is_init)
         {
+            width = pImage->GetWidth();
+            height = pImage->GetHeight();
             if (configure_video_device(video_fd, width, height) != 0)
             {
                 std::cerr << "[spinnaker stream] Failed to configure virtual device" << std::endl;
@@ -175,17 +196,15 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         {
             if (!is_sensor_init)
             {
-                constexpr int buffer_size = 8192;
-                buffer = new char[buffer_size];
+                buffer = new char[BUFFER_SIZE];
                 stream_image = std::make_unique<StreamImage>(width, height);
                 driver_line = std::make_shared<DriverLine>("fisheye_calibration.yaml", "homography_calibration.yaml", width, height);
                 prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml", "homography_calibration.yaml", width, height);
                 velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
-                str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, buffer_size, bufferMutex);
-                vel = std::make_unique<SensorAPI>(Velocity, buffer, buffer_size, bufferMutex);
-                ax = std::make_unique<SensorAPI>(AX, buffer, buffer_size, bufferMutex);
-                is_thread_running = true;
-                sensor_thread = std::thread(receive_data_loop, bridge, buffer, buffer_size, std::ref(bufferMutex), std::ref(is_thread_running));
+                str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, BUFFER_SIZE, bufferMutex);
+                vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
+                ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
+                sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex), std::ref(thread_signal), std::ref(is_thread_running));
                 stream_image->add_component("velocity", velocity);
                 is_sensor_init = true;
             }

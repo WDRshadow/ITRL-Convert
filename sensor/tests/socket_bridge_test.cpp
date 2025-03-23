@@ -39,9 +39,9 @@ TEST(SOCKET_BRIDGE, ASYNC)
     std::shared_mutex bufferMutex;
     char* buffer = new char[BUFFER_SIZE];
     SocketBridge bridge(IP_ADDRESS, PORT);
-    bool flag = true;
-    std::thread t(receive_data_loop, &bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex), std::ref(flag));
-    t.detach();
+    bool flag = false;
+    bool isRunning = false;
+    std::thread t(receive_data_loop, &bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex), std::ref(flag), std::ref(isRunning));
     sleep(2);
     for (int i = 0; i < NUM_FLOATS; i++)
     {
@@ -49,8 +49,22 @@ TEST(SOCKET_BRIDGE, ASYNC)
         float f = getFloatAt(buffer, i);
         EXPECT_EQ(f, i);
     }
-    flag = false;
-    sleep(2);
+    flag = true;
+    if (t.joinable())
+    {
+        int count = 0;
+        while (isRunning && count++ < 10)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        if (isRunning)
+        {
+            std::cerr << "[socket bridge] Sensor thread did not exit gracefully" << std::endl;
+            t.detach();
+        } else {
+            t.join();
+        }
+    }
 }
 
 TEST(SOCKET_BRIDGE, VELOCITY)
@@ -58,12 +72,26 @@ TEST(SOCKET_BRIDGE, VELOCITY)
     std::shared_mutex bufferMutex;
     char* buffer = new char[BUFFER_SIZE];
     SocketBridge bridge(IP_ADDRESS, PORT);
-    bool flag = true;
-    std::thread t(receive_data_loop, &bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex), std::ref(flag));
-    t.detach();
+    bool flag = false;
+    bool isRunning = false;
+    std::thread t(receive_data_loop, &bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex), std::ref(flag), std::ref(isRunning));
     const SensorAPI sensor(Velocity, buffer, BUFFER_SIZE, bufferMutex);
     sleep(2);
     EXPECT_EQ(sensor.get_value(), 10);
-    flag = false;
-    sleep(2);
+    flag = true;
+    if (t.joinable())
+    {
+        int count = 0;
+        while (isRunning && count++ < 10)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        if (isRunning)
+        {
+            std::cerr << "[socket bridge] Sensor thread did not exit gracefully" << std::endl;
+            t.detach();
+        } else {
+            t.join();
+        }
+    }
 }
