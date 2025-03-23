@@ -128,6 +128,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             }
             std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
+            init_rgb2yuyv_cuda(width, height, CUDA_STREAMS);
             yuyv422 = get_cuda_buffer(width * height * 2);
             is_init = true;
         }
@@ -161,7 +162,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         }
 
         // Convert RGB24 to YUYV422
-        rgb2yuyv_cuda(imageData, yuyv422, width, height, CUDA_STREAMS);
+        rgb2yuyv_cuda(imageData, yuyv422);
 
         // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
         if (write(video_fd, yuyv422, width * height * 2) == -1)
@@ -203,7 +204,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     {
         imageData = nullptr;
         free_cuda_buffer(yuyv422);
-        cleanup_cuda_buffers(CUDA_STREAMS);
+        cleanup_rgb2yuyv_cuda();
         is_init = false;
     }
     pImage = nullptr;

@@ -17,15 +17,16 @@
 
 #define CLAMP(x) ((x) < 0 ? 0 : ((x) > 255 ? 255 : x))
 
-unsigned char *d_rgb24 = nullptr;
-unsigned char *d_yuyv422 = nullptr;
-cudaStream_t *streams = nullptr;
 bool is_cuda_initialized = false;
-size_t size_rgb24;
-size_t size_yuyv422;
-int block_height;
+int stream_num_;
+cudaStream_t *streams = nullptr;
+unsigned int width_;
+unsigned int height_;
+unsigned int block_height;
 size_t size_rgb24_block;
 size_t size_yuyv422_block;
+unsigned char *d_rgb24 = nullptr;
+unsigned char *d_yuyv422 = nullptr;
 
 const dim3 blockSize(32, 16);
 dim3 gridSize;
@@ -49,8 +50,8 @@ __global__ void rgb2yuyv_kernel(const unsigned char *rgb24, unsigned char *yuyv4
 
         unsigned char y0 = CLAMP(((Y_R * r0 + Y_G * g0 + Y_B * b0) >> 16) + 16);
         unsigned char y1 = CLAMP(((Y_R * r1 + Y_G * g1 + Y_B * b1) >> 16) + 16);
-        unsigned char u = CLAMP(((U_R * r0 + U_G * g0 + U_B * b0) >> 16) + 128);
-        unsigned char v = CLAMP(((V_R * r0 + V_G * g0 + V_B * b0) >> 16) + 128);
+        unsigned char u = CLAMP(((((U_R * r0 + U_G * g0 + U_B * b0) + (U_R * r1 + U_G * g1 + U_B * b1)) / 2) >> 16) + 128);
+        unsigned char v = CLAMP(((((V_R * r0 + V_G * g0 + V_B * b0) + (V_R * r1 + V_G * g1 + V_B * b1)) / 2) >> 16) + 128);
 
         yuyv422[index_yuyv] = y0;
         yuyv422[index_yuyv + 1] = u;
@@ -59,27 +60,36 @@ __global__ void rgb2yuyv_kernel(const unsigned char *rgb24, unsigned char *yuyv4
     }
 }
 
-void rgb2yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height, int stream_num)
+void init_rgb2yuyv_cuda(unsigned int width, unsigned int height, int stream_num)
 {
+    if (is_cuda_initialized)
+    {
+        cleanup_rgb2yuyv_cuda();
+    }
+    width_ = width;
+    height_ = height;
+    stream_num_ = stream_num;
+    block_height = height / stream_num;
+    size_rgb24_block = width * block_height * 3;
+    size_yuyv422_block = width * block_height * 2;
+    gridSize = dim3((width / 2 + blockSize.x - 1) / blockSize.x, (block_height + blockSize.y - 1) / blockSize.y);
+    streams = (cudaStream_t *)malloc(stream_num * sizeof(cudaStream_t));
+    for (int i = 0; i < stream_num; i++)
+    {
+        cudaStreamCreate(&streams[i]);
+    }
+    cudaMalloc((void **)&d_rgb24, width * height * 3);
+    cudaMalloc((void **)&d_yuyv422, width * height * 2);
+    is_cuda_initialized = true;
+}
 
+void rgb2yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422)
+{
     if (!is_cuda_initialized)
     {
-        size_rgb24 = width * height * 3 * sizeof(unsigned char);
-        size_yuyv422 = width * height * 2 * sizeof(unsigned char);
-        block_height = height / stream_num;
-        size_rgb24_block = width * block_height * 3 * sizeof(unsigned char);
-        size_yuyv422_block = width * block_height * 2 * sizeof(unsigned char);
-        gridSize = dim3((width / 2 + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
-        streams = (cudaStream_t *)malloc(stream_num * sizeof(cudaStream_t));
-        for (int i = 0; i < stream_num; i++)
-        {
-            cudaStreamCreate(&streams[i]);
-        }
-        cudaMalloc((void **)&d_rgb24, size_rgb24);
-        cudaMalloc((void **)&d_yuyv422, size_yuyv422);
-        is_cuda_initialized = true;
+        return;
     }
-    for (int i = 0; i < stream_num; i++)
+    for (int i = 0; i < stream_num_; i++)
     {
         cudaMemcpyAsync(
             d_rgb24 + i * size_rgb24_block,
@@ -91,7 +101,7 @@ void rgb2yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, unsigned 
         rgb2yuyv_kernel<<<gridSize, blockSize, 0, streams[i]>>>(
             d_rgb24 + i * size_rgb24_block,
             d_yuyv422 + i * size_yuyv422_block,
-            width,
+            width_,
             block_height);
 
         cudaMemcpyAsync(
@@ -104,11 +114,11 @@ void rgb2yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, unsigned 
     cudaDeviceSynchronize();
 }
 
-void cleanup_cuda_buffers(int stream_num)
+void cleanup_rgb2yuyv_cuda()
 {
     if (is_cuda_initialized)
     {
-        for (int i = 0; i < stream_num; i++)
+        for (int i = 0; i < stream_num_; i++)
         {
             cudaStreamDestroy(streams[i]);
         }
