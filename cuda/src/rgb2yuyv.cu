@@ -116,20 +116,21 @@ void rgb2yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422)
 
 void cleanup_rgb2yuyv_cuda()
 {
-    if (is_cuda_initialized)
+    if (!is_cuda_initialized)
     {
-        for (int i = 0; i < stream_num_; i++)
-        {
-            cudaStreamDestroy(streams[i]);
-        }
-        free(streams);
-        streams = nullptr;
-        cudaFree(d_rgb24);
-        d_rgb24 = nullptr;
-        cudaFree(d_yuyv422);
-        d_yuyv422 = nullptr;
-        is_cuda_initialized = false;
+        return;
     }
+    for (int i = 0; i < stream_num_; i++)
+    {
+        cudaStreamDestroy(streams[i]);
+    }
+    free(streams);
+    streams = nullptr;
+    cudaFree(d_rgb24);
+    d_rgb24 = nullptr;
+    cudaFree(d_yuyv422);
+    d_yuyv422 = nullptr;
+    is_cuda_initialized = false;
 }
 
 unsigned char *get_cuda_buffer(size_t size)
