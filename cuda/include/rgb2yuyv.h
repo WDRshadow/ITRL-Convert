@@ -19,14 +19,16 @@ extern "C"
      * @param yuyv422 YUYV422 data (output)
      * @param width Image width
      * @param height Image height
+     * @param stream_num Stream number
      */
-    void convert_rgb24_to_yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width,
-                                    unsigned int height);
+    void rgb2yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width,
+                       unsigned int height, int stream_num);
 
     /**
      * Cleanup CUDA buffers.
+     * @param stream_num Stream number
      */
-    void cleanup_cuda_buffers();
+    void cleanup_cuda_buffers(int stream_num);
 
     /**
      * Use cudaHostAlloc to allocate a pinned memory buffer.

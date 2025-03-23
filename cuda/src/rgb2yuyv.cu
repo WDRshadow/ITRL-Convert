@@ -19,8 +19,10 @@
 
 unsigned char *d_rgb24 = nullptr;
 unsigned char *d_yuyv422 = nullptr;
+cudaStream_t *streams = nullptr;
+bool is_cuda_initialized = false;
 
-__global__ void convert_rgb24_to_yuyv_cuda_kernel(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height)
+__global__ void rgb2yuyv_kernel(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height)
 {
     int x = (blockIdx.x * blockDim.x + threadIdx.x) * 2;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -49,43 +51,82 @@ __global__ void convert_rgb24_to_yuyv_cuda_kernel(const unsigned char *rgb24, un
     }
 }
 
-void convert_rgb24_to_yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height)
+void rgb2yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height, int stream_num)
 {
-    static size_t size_rgb24 = width * height * 3 * sizeof(unsigned char);
-    static size_t size_yuyv422 = width * height * 2 * sizeof(unsigned char);
-    static dim3 blockSize(32, 16);
-    static dim3 gridSize((width / 2 + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
-    if (d_rgb24 == nullptr)
+    static const size_t size_rgb24 = width * height * 3 * sizeof(unsigned char);
+    static const size_t size_yuyv422 = width * height * 2 * sizeof(unsigned char);
+    static const int block_height = height / stream_num;
+    static const size_t size_rgb24_block = width * block_height * 3 * sizeof(unsigned char);
+    static const size_t size_yuyv422_block = width * block_height * 2 * sizeof(unsigned char);
+
+    static const dim3 blockSize(32, 16);
+    static const dim3 gridSize((width / 2 + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
+
+    if (!is_cuda_initialized)
     {
+        streams = (cudaStream_t *)malloc(stream_num * sizeof(cudaStream_t));
+        for (int i = 0; i < stream_num; i++)
+        {
+            cudaStreamCreate(&streams[i]);
+        }
         cudaMalloc((void **)&d_rgb24, size_rgb24);
         cudaMalloc((void **)&d_yuyv422, size_yuyv422);
+        is_cuda_initialized = true;
     }
-    cudaMemcpy(d_rgb24, rgb24, width * height * 3, cudaMemcpyHostToDevice);
-    convert_rgb24_to_yuyv_cuda_kernel<<<gridSize, blockSize>>>(d_rgb24, d_yuyv422, width, height);
-    cudaMemcpy(yuyv422, d_yuyv422, size_yuyv422, cudaMemcpyDeviceToHost);
-}
-
-void cleanup_cuda_buffers()
-{
-    if (d_rgb24)
+    for (int i = 0; i < stream_num; i++)
     {
+        cudaMemcpyAsync(
+            d_rgb24 + i * size_rgb24_block,
+            rgb24 + i * size_rgb24_block,
+            size_rgb24_block,
+            cudaMemcpyHostToDevice,
+            streams[i]);
+
+        rgb2yuyv_kernel<<<gridSize, blockSize, 0, streams[i]>>>(
+            d_rgb24 + i * size_rgb24_block,
+            d_yuyv422 + i * size_yuyv422_block,
+            width,
+            block_height);
+
+        cudaMemcpyAsync(
+            yuyv422 + i * size_yuyv422_block,
+            d_yuyv422 + i * size_yuyv422_block,
+            size_yuyv422_block,
+            cudaMemcpyDeviceToHost,
+            streams[i]);
+    }
+    cudaDeviceSynchronize();
+}
+
+void cleanup_cuda_buffers(int stream_num)
+{
+    if (is_cuda_initialized)
+    {
+        for (int i = 0; i < stream_num; i++)
+        {
+            cudaStreamDestroy(streams[i]);
+        }
+        free(streams);
+        streams = nullptr;
         cudaFree(d_rgb24);
-        cudaFree(d_yuyv422);
         d_rgb24 = nullptr;
+        cudaFree(d_yuyv422);
         d_yuyv422 = nullptr;
+        is_cuda_initialized = false;
     }
 }
 
-unsigned char *get_cuda_buffer(size_t size) 
+unsigned char *get_cuda_buffer(size_t size)
 {
     unsigned char *h_pinned = nullptr;
     cudaMallocHost((void **)&h_pinned, size);
     return h_pinned;
 }
 
-void free_cuda_buffer(unsigned char *h_pinned) 
+void free_cuda_buffer(unsigned char *h_pinned)
 {
-    if (h_pinned) {
+    if (h_pinned)
+    {
         cudaFreeHost(h_pinned);
     }
 }

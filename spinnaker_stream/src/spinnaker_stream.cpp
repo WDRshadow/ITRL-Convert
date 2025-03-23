@@ -13,14 +13,16 @@
 #include "socket_bridge.h"
 #include "sensor.h"
 
+#define CUDA_STREAMS 8
+
 bool is_init = false;
 int video_fd;
 Spinnaker::SystemPtr system_c = nullptr;
 Spinnaker::CameraPtr camera = nullptr;
 Spinnaker::CameraList camList;
 Spinnaker::ImagePtr pImage = nullptr;
-SocketBridge* bridge = nullptr;
-char* buffer = nullptr;
+SocketBridge *bridge = nullptr;
+char *buffer = nullptr;
 bool is_sensor_init = false;
 bool is_thread_running = false;
 unsigned char *imageData = nullptr;
@@ -37,11 +39,11 @@ void cleanup_stream()
         delete bridge;
         bridge = nullptr;
     }
-    if (is_init) 
+    if (is_init)
     {
         imageData = nullptr;
         free_cuda_buffer(yuyv422);
-        cleanup_cuda_buffers();
+        cleanup_cuda_buffers(CUDA_STREAMS);
     }
     if (pImage.IsValid())
     {
@@ -185,7 +187,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 is_thread_running = true;
                 sensor_thread = std::thread(receive_data_loop, bridge, buffer, buffer_size, std::ref(bufferMutex), std::ref(is_thread_running));
                 stream_image->add_component("velocity", velocity);
-                is_sensor_init = true; 
+                is_sensor_init = true;
             }
             driver_line->update(str_whe_phi->get_value());
             *driver_line >> imageData;
@@ -196,7 +198,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         }
 
         // Convert RGB24 to YUYV422
-        convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
+        rgb2yuyv_cuda(imageData, yuyv422, width, height, CUDA_STREAMS);
 
         // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
         if (write(video_fd, yuyv422, width * height * 2) == -1)
