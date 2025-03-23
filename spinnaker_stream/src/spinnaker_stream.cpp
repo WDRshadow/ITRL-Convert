@@ -75,7 +75,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     // Define the smart pointer objects
     std::unique_ptr<StreamImage> stream_image;
     std::shared_ptr<DriverLine> driver_line;
-    std::shared_ptr<PredictionLine> prediction_line;
+    // std::shared_ptr<PredictionLine> prediction_line;
     std::shared_ptr<TextComponent> velocity;
     std::shared_mutex bufferMutex;
     std::unique_ptr<SensorAPI> str_whe_phi;
@@ -144,7 +144,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 buffer = new char[BUFFER_SIZE];
                 stream_image = std::make_unique<StreamImage>(width, height);
                 driver_line = std::make_shared<DriverLine>("fisheye_calibration.yaml", "homography_calibration.yaml", width, height);
-                prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml", "homography_calibration.yaml", width, height);
+                // prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml", "homography_calibration.yaml", width, height);
                 velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
                 str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, BUFFER_SIZE, bufferMutex);
                 vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
@@ -155,8 +155,8 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             }
             driver_line->update(str_whe_phi->get_value());
             *driver_line >> imageData;
-            prediction_line->update(vel->get_value(), ax->get_value(), str_whe_phi->get_value(), 0.1);
-            *prediction_line >> imageData;
+            // prediction_line->update(vel->get_value(), ax->get_value(), str_whe_phi->get_value(), 0.1);
+            // *prediction_line >> imageData;
             velocity->update(to_string(static_cast<int>(vel->get_value())));
             stream_image->update(imageData);
         }

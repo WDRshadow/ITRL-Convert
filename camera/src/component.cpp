@@ -121,10 +121,42 @@ PredictionLine::PredictionLine(const string& fisheye_config, const string& homog
 
 void PredictionLine::update(const float v, const float a, const float str_whe_phi, const float latency)
 {
-    const double omega = bycicleModel(v, str_whe_phi, RCVE_WHBASE, RCVE_RATIO);
-    State predicted = predictCYRA(v, a, omega, THETA0, latency);
-    const vector<Point2f> line = create_line({static_cast<float>(1536 + predicted.y * 25), static_cast<float>(2047 - predicted.x * 25)},
-                                             predicted.theta, 25, 50);
+    const double omega = bycicleModel(v, str_whe_phi / 20.0f, RCVE_WHBASE, RCVE_RATIO);
+    const State predicted = predictCYRA(v, a, omega, THETA0, latency);
+    vector<Point2f> line = create_line({
+                                           static_cast<float>(1536 + predicted.y * 25),
+                                           static_cast<float>(2047 - predicted.x * 25)
+                                       },
+                                       predicted.theta, 25, 50);
+    // --------------------------------------------------------------------------------------------
+    const auto cos_theta = static_cast<float>(cos(predicted.theta));
+    const auto sin_theta = static_cast<float>(sin(predicted.theta));
+    const float x_l = 1536 + static_cast<float>(predicted.y) * 25 - 25 * cos_theta;
+    const float y_l = 2047 - static_cast<float>(predicted.x) * 25 - 25 * sin_theta;
+    const float x_r = 1536 + static_cast<float>(predicted.y) * 25 + 25 * cos_theta;
+    const float y_r = 2047 - static_cast<float>(predicted.x) * 25 + 25 * sin_theta;
+    const float angle = str_whe_phi / 4.1f;
+    const vector<Point2f> line_left = create_curve(
+        {x_l, y_l},
+        {x_l + 384 * sin_theta, y_l - 384 * cos_theta},
+        {
+            x_l + 768 * sin_theta + 125 * tan(angle) * cos_theta,
+            y_l - 768 * cos_theta + 125 * tan(angle) * sin_theta
+        },
+        300
+    );
+    const vector<Point2f> line_right = create_curve(
+        {x_r, y_r},
+        {x_r + 384 * sin_theta, y_r - 384 * cos_theta},
+        {
+            x_r + 768 * sin_theta + 125 * tan(angle) * cos_theta,
+            y_r - 768 * cos_theta + 125 * tan(angle) * sin_theta
+        },
+        300
+    );
+    line.insert(line.end(), line_left.begin(), line_left.end());
+    line.insert(line.end(), line_right.begin(), line_right.end());
+    // --------------------------------------------------------------------------------------------
     project(line);
 }
 
