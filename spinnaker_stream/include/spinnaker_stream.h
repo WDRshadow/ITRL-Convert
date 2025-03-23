@@ -4,6 +4,6 @@
 int configure_video_device(int video_fd, int width, int height);
 
 // Function to capture frames from the FLIR camera and stream them in supported formats
-void capture_frames(const char* video_device, const std::string& ip, int port);
+void capture_frames(const char* video_device, const std::string& ip, int port, bool &signal);
 
 #endif //SPINNAKER_STREAM_H

@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include <string>
 #include <opencv2/opencv.hpp>
+#include <csignal>
 
 #include "spinnaker_stream.h"
 #include "fisheye.h"
@@ -11,9 +12,11 @@
 #define DEFAULT_IP "0.0.0.0"
 #define DEFAULT_PORT 10086
 
+bool capture_signal = false;
+
 void run_spinnaker_stream(const char* videoDevice, const char* ip, int port) {
     std::cout << "[main] Starting to capture frames from the FLIR camera..." << std::endl;
-    capture_frames(videoDevice, ip, port);
+    capture_frames(videoDevice, ip, port, capture_signal);
     std::cout << "[main] Capture process finished" << std::endl;
 }
 
@@ -42,6 +45,12 @@ void run_hc()
     fs["points"] >> dst;
     const Homography homography(&src, &dst);
     homography.save("homography_calibration.yaml");
+}
+
+void signalHandler(int signum)
+{
+    std::cout << "[main] Received signal " << signum << ", cleaning up resources..." << std::endl;
+    capture_signal = true;
 }
 
 std::unordered_map<std::string, std::string> parseArguments(int argc, char* argv[]) {
@@ -124,6 +133,9 @@ int main(int argc, char* argv[]) {
         ip = "0.0.0.0";
         port = -1;
     }
+
+    signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
 
     run_spinnaker_stream(videoDevice, ip, port);
     return 0;

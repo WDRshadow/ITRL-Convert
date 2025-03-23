@@ -5,7 +5,6 @@
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
 #include <thread>
-#include <csignal>
 
 #include "spinnaker_stream.h"
 #include "component.h"
@@ -31,57 +30,6 @@ unsigned char *imageData = nullptr;
 unsigned char *yuyv422 = nullptr;
 std::thread sensor_thread;
 
-void cleanup_stream()
-{
-    if (is_sensor_init)
-    {
-        thread_signal = true;
-        if (sensor_thread.joinable())
-        {
-            int count = 0;
-            while (is_thread_running && count++ < 30)
-            {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-            if (is_thread_running)
-            {
-                std::cerr << "[spinnaker stream] Sensor thread did not exit gracefully" << std::endl;
-                sensor_thread.detach();
-            } else {
-                sensor_thread.join();
-            }
-        }
-        thread_signal = false;
-        delete[] buffer;
-        buffer = nullptr;
-        delete bridge;
-        bridge = nullptr;
-        is_sensor_init = false;
-    }
-    if (is_init)
-    {
-        imageData = nullptr;
-        free_cuda_buffer(yuyv422);
-        cleanup_cuda_buffers(CUDA_STREAMS);
-        is_init = false;
-    }
-    pImage = nullptr;
-    camera->EndAcquisition();
-    camera->DeInit();
-    camera = nullptr;
-    camList.Clear();
-    system_c->ReleaseInstance();
-    system_c = nullptr;
-    close(video_fd);
-}
-
-void signalHandler(int signum)
-{
-    std::cout << "[spinnaker stream] Received signal " << signum << ", cleaning up resources..." << std::endl;
-    cleanup_stream();
-    exit(signum);
-}
-
 int configure_video_device(int video_fd, int width, int height)
 {
     struct v4l2_format vfmt = {};
@@ -102,7 +50,7 @@ int configure_video_device(int video_fd, int width, int height)
     return 0;
 }
 
-void capture_frames(const char *video_device, const std::string &ip, const int port)
+void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal)
 {
     // Open the virtual V4L2 device
     video_fd = open(video_device, O_WRONLY);
@@ -123,10 +71,6 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     camera = camList.GetByIndex(0);
     camera->Init();
     camera->BeginAcquisition();
-
-    // Register signal handlers for cleanup
-    signal(SIGINT, signalHandler);
-    signal(SIGTERM, signalHandler);
 
     // Define the smart pointer objects
     std::unique_ptr<StreamImage> stream_image;
@@ -162,7 +106,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     unsigned int width;
     unsigned int height;
 
-    while (true)
+    while (!signal)
     {
         pImage = camera->GetNextImage();
 
@@ -229,5 +173,45 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         pImage->Release();
     }
 
-    cleanup_stream();
+    // Cleanup
+    if (is_sensor_init)
+    {
+        thread_signal = true;
+        if (sensor_thread.joinable())
+        {
+            int count = 0;
+            while (is_thread_running && count++ < 30)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            if (is_thread_running)
+            {
+                std::cerr << "[spinnaker stream] Sensor thread did not exit gracefully" << std::endl;
+                sensor_thread.detach();
+            } else {
+                sensor_thread.join();
+            }
+        }
+        thread_signal = false;
+        delete[] buffer;
+        buffer = nullptr;
+        delete bridge;
+        bridge = nullptr;
+        is_sensor_init = false;
+    }
+    if (is_init)
+    {
+        imageData = nullptr;
+        free_cuda_buffer(yuyv422);
+        cleanup_cuda_buffers(CUDA_STREAMS);
+        is_init = false;
+    }
+    pImage = nullptr;
+    camera->EndAcquisition();
+    camera->DeInit();
+    camera = nullptr;
+    camList.Clear();
+    system_c->ReleaseInstance();
+    system_c = nullptr;
+    close(video_fd);
 }
