@@ -22,7 +22,6 @@ Spinnaker::CameraPtr camera = nullptr;
 Spinnaker::CameraList camList;
 Spinnaker::ImagePtr pImage = nullptr;
 SocketBridge* bridge = nullptr;
-std::shared_mutex* bufferMutex = nullptr;
 char* buffer = nullptr;
 bool is_sensor_init = false;
 bool thread_signal = false;
@@ -30,36 +29,6 @@ bool is_thread_running = false;
 unsigned char* imageData = nullptr;
 unsigned char* yuyv422 = nullptr;
 std::thread sensor_thread;
-
-int configure_video_device(int video_fd, int width, int height)
-{
-    struct v4l2_format vfmt = {};
-    vfmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-    vfmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
-    vfmt.fmt.pix.field = V4L2_FIELD_NONE;
-    vfmt.fmt.pix.width = width;
-    vfmt.fmt.pix.height = height;
-    vfmt.fmt.pix.bytesperline = width * 2;
-    vfmt.fmt.pix.sizeimage = width * height * 2;
-
-    if (ioctl(video_fd, VIDIOC_S_FMT, &vfmt) < 0)
-    {
-        std::cerr << "[spinnaker stream] Failed to set video format on virtual device" << std::endl;
-        return -1;
-    }
-
-    struct v4l2_streamparm streamparm = {};
-    streamparm.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-    streamparm.parm.output.timeperframe.numerator = 1;
-    streamparm.parm.output.timeperframe.denominator = 60;
-    if (ioctl(video_fd, VIDIOC_S_PARM, &streamparm) < 0)
-    {
-        std::cerr << "[spinnaker stream] Failed to set frame rate" << std::endl;
-        return -1;
-    }
-
-    return 0;
-}
 
 void capture_frames(const char* video_device, const std::string& ip, const int port, bool& signal)
 {
@@ -83,7 +52,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     camera->Init();
     camera->BeginAcquisition();
 
-    // Define the smart pointer objects
+    // Define the sensor data components
     std::unique_ptr<StreamImage> stream_image;
     std::shared_ptr<PredictionLine> prediction_line;
     std::shared_ptr<TextComponent> velocity;
@@ -91,6 +60,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     std::unique_ptr<SensorAPI> str_whe_phi;
     std::unique_ptr<SensorAPI> vel;
     std::unique_ptr<SensorAPI> ax;
+    std::shared_mutex bufferMutex;
 
     // Initialize Streaming Component
     bool is_sensor_connected = false;
@@ -129,21 +99,46 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
             continue;
         }
 
-        // Print the pixel format only once and initialize the virtual device
+        // Print the pixel format only once and initialize the virtual device and CUDA
         if (!is_init)
         {
+            // Get the image size
             width = pImage->GetWidth();
             height = pImage->GetHeight();
-            if (configure_video_device(video_fd, width, height) != 0)
+            std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() <<
+            std::endl;
+
+            // Set the video device format
+            struct v4l2_format vfmt = {};
+            vfmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+            vfmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+            vfmt.fmt.pix.field = V4L2_FIELD_NONE;
+            vfmt.fmt.pix.width = width;
+            vfmt.fmt.pix.height = height;
+            vfmt.fmt.pix.bytesperline = width * 2;
+            vfmt.fmt.pix.sizeimage = width * height * 2;
+            if (ioctl(video_fd, VIDIOC_S_FMT, &vfmt) < 0)
             {
-                std::cerr << "[spinnaker stream] Failed to configure virtual device" << std::endl;
+                std::cerr << "[spinnaker stream] Failed to set video format on virtual device" << std::endl;
                 break;
             }
-            std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() <<
-                std::endl;
-            std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
+        
+            // Set the frame rate
+            struct v4l2_streamparm streamparm = {};
+            streamparm.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+            streamparm.parm.output.timeperframe.numerator = 1;
+            streamparm.parm.output.timeperframe.denominator = 60;
+            if (ioctl(video_fd, VIDIOC_S_PARM, &streamparm) < 0)
+            {
+                std::cerr << "[spinnaker stream] Failed to set frame rate" << std::endl;
+                break;
+            }
+
+            // Initialize CUDA and allocate memory for YUYV422 format
             init_rgb2yuyv_cuda(width, height, CUDA_STREAMS);
             yuyv422 = get_cuda_buffer(width * height * 2);
+            
+            std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
             is_init = true;
         }
 
@@ -162,11 +157,10 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
                                                                    "homography_calibration.yaml", width, height);
                 velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
                 latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
-                bufferMutex = new std::shared_mutex();
-                str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, BUFFER_SIZE, *bufferMutex);
-                vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, *bufferMutex);
-                ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, *bufferMutex);
-                sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(*bufferMutex),
+                str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, BUFFER_SIZE, bufferMutex);
+                vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
+                ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
+                sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex),
                                             std::ref(thread_signal), std::ref(is_thread_running));
                 stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
                 stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
@@ -174,8 +168,8 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
                 latency_label->update("Latency: 0 ms");
                 is_sensor_init = true;
             }
-            prediction_line->update(vel->get_value(), ax->get_value(), str_whe_phi->get_value(), 0.0);
-            velocity->update(to_string(static_cast<int>(vel->get_value())));
+            prediction_line->update(vel->get_value() * 3.6f, ax->get_value(), str_whe_phi->get_value(), 0.0);
+            velocity->update(to_string(static_cast<int>(vel->get_value() * 3.6f)));
             *stream_image >> imageData;
         }
 
@@ -219,8 +213,6 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         delete bridge;
         bridge = nullptr;
         is_sensor_init = false;
-        delete bufferMutex;
-        bufferMutex = nullptr;
     }
     if (is_init)
     {
