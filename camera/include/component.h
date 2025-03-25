@@ -21,32 +21,37 @@ class StreamImage
 public:
     StreamImage(int width, int height);
     void add_component(const string& name, const shared_ptr<Component>& component);
-    void update(const unsigned char* imageData);
-    void update(Mat& imageData);
+    void operator>>(const unsigned char* imageData) const;
+    void operator>>(Mat& imageData) const;
 };
 
 class Component
 {
     friend class StreamImage;
-    [[nodiscard]] shared_ptr<Mat> get_img();
+
+public:
+    virtual ~Component() = default;
+    virtual void operator>>(Mat& imageData) const = 0;
+};
+
+class ImageComponent : public Component
+{
+    friend class StreamImage;
 
 protected:
     const int cx;
     const int cy;
     const int width;
     const int height;
-    shared_ptr<Mat> img;
-    void reset_img() const;
+    Mat img;
+    void reset_img();
 
 public:
-    Component(int cx, int cy, int width, int height);
-    virtual ~Component() = default;
-    virtual void update(const unordered_map<string, string>& arg) = 0;
-    [[nodiscard]] int get_center_x() const;
-    [[nodiscard]] int get_center_y() const;
+    ImageComponent(int cx, int cy, int width, int height);
+    void operator>>(Mat& imageData) const override;
 };
 
-class LineComponent
+class LineComponent : public Component
 {
 protected:
     const int width;
@@ -58,36 +63,28 @@ protected:
 
 public:
     LineComponent(const string& fisheye_config, const string& homography_config, int width, int height);
-    virtual ~LineComponent() = default;
-    virtual void update(const unordered_map<string, string>& arg) = 0;
-    void operator>>(unsigned char* imageData) const;
-    void operator>>(Mat& imageData) const;
+    void operator>>(Mat& imageData) const override;
 };
 
-class DriverLine : public LineComponent
+class DriverLine final : public LineComponent
 {
-    void update(const unordered_map<string, string>& arg) override;
-
 public:
     DriverLine(const string& fisheye_config, const string& homography_config, int width, int height);
     void update(float str_whe_phi);
 };
 
-class PredictionLine : public LineComponent
+class PredictionLine final : public LineComponent
 {
-    void update(const unordered_map<string, string>& arg) override;
-
 public:
     PredictionLine(const string& fisheye_config, const string& homography_config, int width, int height);
     void update(float v, float a, float str_whe_phi, float latency);
 };
 
-class TextComponent final : public Component
+class TextComponent final : public ImageComponent
 {
 public:
     TextComponent(int x, int y, int width, int height);
-    void update(const string& text) const;
-    void update(const unordered_map<string, string>& arg) override;
+    void update(const string& text);
 };
 
 #endif //COMPONENT_H

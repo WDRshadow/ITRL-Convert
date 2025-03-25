@@ -21,13 +21,14 @@ Spinnaker::SystemPtr system_c = nullptr;
 Spinnaker::CameraPtr camera = nullptr;
 Spinnaker::CameraList camList;
 Spinnaker::ImagePtr pImage = nullptr;
-SocketBridge *bridge = nullptr;
-char *buffer = nullptr;
+SocketBridge* bridge = nullptr;
+std::shared_mutex* bufferMutex = nullptr;
+char* buffer = nullptr;
 bool is_sensor_init = false;
 bool thread_signal = false;
 bool is_thread_running = false;
-unsigned char *imageData = nullptr;
-unsigned char *yuyv422 = nullptr;
+unsigned char* imageData = nullptr;
+unsigned char* yuyv422 = nullptr;
 std::thread sensor_thread;
 
 int configure_video_device(int video_fd, int width, int height)
@@ -47,10 +48,20 @@ int configure_video_device(int video_fd, int width, int height)
         return -1;
     }
 
+    struct v4l2_streamparm streamparm = {};
+    streamparm.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+    streamparm.parm.output.timeperframe.numerator = 1;
+    streamparm.parm.output.timeperframe.denominator = 60;
+    if (ioctl(video_fd, VIDIOC_S_PARM, &streamparm) < 0)
+    {
+        std::cerr << "[spinnaker stream] Failed to set frame rate" << std::endl;
+        return -1;
+    }
+
     return 0;
 }
 
-void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal)
+void capture_frames(const char* video_device, const std::string& ip, const int port, bool& signal)
 {
     // Open the virtual V4L2 device
     video_fd = open(video_device, O_WRONLY);
@@ -74,10 +85,9 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
 
     // Define the smart pointer objects
     std::unique_ptr<StreamImage> stream_image;
-    std::shared_ptr<DriverLine> driver_line;
-    // std::shared_ptr<PredictionLine> prediction_line;
+    std::shared_ptr<PredictionLine> prediction_line;
     std::shared_ptr<TextComponent> velocity;
-    std::shared_mutex bufferMutex;
+    std::shared_ptr<TextComponent> latency_label;
     std::unique_ptr<SensorAPI> str_whe_phi;
     std::unique_ptr<SensorAPI> vel;
     std::unique_ptr<SensorAPI> ax;
@@ -87,7 +97,10 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     if (port != -1)
     {
         bridge = new SocketBridge(ip, port);
-        is_sensor_connected = bridge->isValid();
+        if (bridge)
+        {
+            is_sensor_connected = bridge->isValid();
+        }
     }
     if (is_sensor_connected)
     {
@@ -126,7 +139,8 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 std::cerr << "[spinnaker stream] Failed to configure virtual device" << std::endl;
                 break;
             }
-            std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
+            std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() <<
+                std::endl;
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
             init_rgb2yuyv_cuda(width, height, CUDA_STREAMS);
             yuyv422 = get_cuda_buffer(width * height * 2);
@@ -134,7 +148,8 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         }
 
         // Handle BayerRG8 format: Convert BayerRG8 to RGB8
-        imageData = static_cast<unsigned char *>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->GetData());
+        imageData = static_cast<unsigned char*>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->
+                                                        GetData());
 
         // Add components to the image
         if (is_sensor_connected)
@@ -143,22 +158,25 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             {
                 buffer = new char[BUFFER_SIZE];
                 stream_image = std::make_unique<StreamImage>(width, height);
-                driver_line = std::make_shared<DriverLine>("fisheye_calibration.yaml", "homography_calibration.yaml", width, height);
-                // prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml", "homography_calibration.yaml", width, height);
+                prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
+                                                                   "homography_calibration.yaml", width, height);
                 velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
-                str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, BUFFER_SIZE, bufferMutex);
-                vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
-                ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
-                sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex), std::ref(thread_signal), std::ref(is_thread_running));
-                stream_image->add_component("velocity", velocity);
+                latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
+                bufferMutex = new std::shared_mutex();
+                str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, BUFFER_SIZE, *bufferMutex);
+                vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, *bufferMutex);
+                ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, *bufferMutex);
+                sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(*bufferMutex),
+                                            std::ref(thread_signal), std::ref(is_thread_running));
+                stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
+                stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
+                stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
+                latency_label->update("Latency: 0 ms");
                 is_sensor_init = true;
             }
-            driver_line->update(str_whe_phi->get_value());
-            *driver_line >> imageData;
-            // prediction_line->update(vel->get_value(), ax->get_value(), str_whe_phi->get_value(), 0.1);
-            // *prediction_line >> imageData;
+            prediction_line->update(vel->get_value(), ax->get_value(), str_whe_phi->get_value(), 0.0);
             velocity->update(to_string(static_cast<int>(vel->get_value())));
-            stream_image->update(imageData);
+            *stream_image >> imageData;
         }
 
         // Convert RGB24 to YUYV422
@@ -189,7 +207,9 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             {
                 std::cerr << "[spinnaker stream] Sensor thread did not exit gracefully" << std::endl;
                 sensor_thread.detach();
-            } else {
+            }
+            else
+            {
                 sensor_thread.join();
             }
         }
@@ -199,6 +219,8 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         delete bridge;
         bridge = nullptr;
         is_sensor_init = false;
+        delete bufferMutex;
+        bufferMutex = nullptr;
     }
     if (is_init)
     {
