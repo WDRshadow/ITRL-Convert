@@ -4,171 +4,229 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
+#include <thread>
 
 #include "spinnaker_stream.h"
+#include "component.h"
 #include "rgb2yuyv.h"
+#include "socket_bridge.h"
+#include "sensor.h"
 
-extern "C"
+#define BUFFER_SIZE 8192
+#define CUDA_STREAMS 8
+
+bool is_init = false;
+int video_fd;
+Spinnaker::SystemPtr system_c = nullptr;
+Spinnaker::CameraPtr camera = nullptr;
+Spinnaker::CameraList camList;
+Spinnaker::ImagePtr pImage = nullptr;
+SocketBridge* bridge = nullptr;
+char* buffer = nullptr;
+bool is_sensor_init = false;
+bool thread_signal = false;
+bool is_thread_running = false;
+unsigned char* imageData = nullptr;
+unsigned char* yuyv422 = nullptr;
+std::thread sensor_thread;
+
+void capture_frames(const char* video_device, const std::string& ip, const int port, bool& signal)
 {
-
-    int configure_video_device(int video_fd, int width, int height, __u32 pixel_format)
+    // Open the virtual V4L2 device
+    video_fd = open(video_device, O_WRONLY);
+    if (video_fd < 0)
     {
-        struct v4l2_format vfmt = {};
-        vfmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-        vfmt.fmt.pix.width = width;
-        vfmt.fmt.pix.height = height;
-        vfmt.fmt.pix.pixelformat = pixel_format;
-        vfmt.fmt.pix.field = V4L2_FIELD_NONE;
-        switch (pixel_format)
+        std::cerr << "[spinnaker stream] Failed to open virtual video device" << std::endl;
+        return;
+    }
+
+    // Initialize Spinnaker
+    system_c = Spinnaker::System::GetInstance();
+    camList = system_c->GetCameras();
+    if (camList.GetSize() == 0)
+    {
+        std::cerr << "[spinnaker stream] No cameras detected!" << std::endl;
+        return;
+    }
+    camera = camList.GetByIndex(0);
+    camera->Init();
+    camera->BeginAcquisition();
+
+    // Define the sensor data components
+    std::unique_ptr<StreamImage> stream_image;
+    std::shared_ptr<PredictionLine> prediction_line;
+    std::shared_ptr<TextComponent> velocity;
+    std::shared_ptr<TextComponent> latency_label;
+    std::unique_ptr<SensorAPI> str_whe_phi;
+    std::unique_ptr<SensorAPI> vel;
+    std::unique_ptr<SensorAPI> ax;
+    std::shared_mutex bufferMutex;
+
+    // Initialize Streaming Component
+    bool is_sensor_connected = false;
+    if (port != -1)
+    {
+        bridge = new SocketBridge(ip, port);
+        if (bridge)
         {
-        case V4L2_PIX_FMT_RGB24:
-            vfmt.fmt.pix.bytesperline = width * 3;
-            vfmt.fmt.pix.sizeimage = width * height * 3;
-            break;
-        case V4L2_PIX_FMT_YUYV:
+            is_sensor_connected = bridge->isValid();
+        }
+    }
+    if (is_sensor_connected)
+    {
+        std::cout << "[spinnaker stream] Listening to sensor data..." << std::endl;
+    }
+    else
+    {
+        if (bridge)
+        {
+            delete bridge;
+            bridge = nullptr;
+        }
+        std::cout << "[spinnaker stream] Sensor data not available." << std::endl;
+    }
+
+    unsigned int width;
+    unsigned int height;
+
+    while (!signal)
+    {
+        pImage = camera->GetNextImage();
+
+        if (pImage->IsIncomplete())
+        {
+            std::cerr << "[spinnaker stream] Image incomplete: " << pImage->GetImageStatus() << std::endl;
+            continue;
+        }
+
+        // Print the pixel format only once and initialize the virtual device and CUDA
+        if (!is_init)
+        {
+            // Get the image size
+            width = pImage->GetWidth();
+            height = pImage->GetHeight();
+            std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() <<
+            std::endl;
+
+            // Set the video device format
+            struct v4l2_format vfmt = {};
+            vfmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+            vfmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+            vfmt.fmt.pix.field = V4L2_FIELD_NONE;
+            vfmt.fmt.pix.width = width;
+            vfmt.fmt.pix.height = height;
             vfmt.fmt.pix.bytesperline = width * 2;
             vfmt.fmt.pix.sizeimage = width * height * 2;
-            break;
-        default:
-            std::cerr << "Unsupported pixel format" << std::endl;
-            return -1;
-        }
-
-        if (ioctl(video_fd, VIDIOC_S_FMT, &vfmt) < 0)
-        {
-            std::cerr << "Failed to set video format on virtual device" << std::endl;
-            return -1;
-        }
-
-        return 0;
-    }
-
-    __u32 spinnaker_to_v4l2_format(Spinnaker::PixelFormatEnums pixelFormat)
-    {
-        switch (pixelFormat)
-        {
-        case Spinnaker::PixelFormatEnums::PixelFormat_RGB8:
-            return V4L2_PIX_FMT_RGB24;
-        case Spinnaker::PixelFormatEnums::PixelFormat_BGR8:
-            return V4L2_PIX_FMT_BGR24;
-        case Spinnaker::PixelFormatEnums::PixelFormat_Mono8:
-            return V4L2_PIX_FMT_GREY;
-        case Spinnaker::PixelFormatEnums::PixelFormat_YUV422Packed:
-            return V4L2_PIX_FMT_YUYV; // YUV422 packed (YUYV)
-        default:
-            return 0; // Unsupported format
-        }
-    }
-
-    const char *pixel_format_to_string(Spinnaker::PixelFormatEnums pixelFormat)
-    {
-        switch (pixelFormat)
-        {
-        case Spinnaker::PixelFormatEnums::PixelFormat_Mono8:
-            return "Mono8";
-        case Spinnaker::PixelFormatEnums::PixelFormat_Mono16:
-            return "Mono16";
-        case Spinnaker::PixelFormatEnums::PixelFormat_RGB8:
-            return "RGB8";
-        case Spinnaker::PixelFormatEnums::PixelFormat_BGR8:
-            return "BGR8";
-        case Spinnaker::PixelFormatEnums::PixelFormat_YUV422Packed:
-            return "YUV422Packed";
-        case Spinnaker::PixelFormatEnums::PixelFormat_BayerRG8:
-            return "BayerRG8";
-        default:
-            return "Unknown format";
-        }
-    }
-
-    void capture_frames(const char *video_device)
-    {
-        // Open the virtual V4L2 device
-        int video_fd = open(video_device, O_WRONLY);
-        if (video_fd < 0)
-        {
-            std::cerr << "Failed to open virtual video device" << std::endl;
-            return;
-        }
-
-        // Initialize Spinnaker
-        Spinnaker::SystemPtr system = Spinnaker::System::GetInstance();
-        Spinnaker::CameraList camList = system->GetCameras();
-
-        if (camList.GetSize() == 0)
-        {
-            std::cerr << "No cameras detected!" << std::endl;
-            return;
-        }
-
-        Spinnaker::CameraPtr camera = camList.GetByIndex(0);
-        camera->Init();
-
-        bool pixel_format_printed = false;
-        bool is_configured = false;
-
-        // Start capturing images
-        camera->BeginAcquisition();
-
-        while (true)
-        {
-            static Spinnaker::ImagePtr pImage = nullptr;
-
-            pImage = camera->GetNextImage();
-
-            static unsigned int width = pImage->GetWidth();
-            static unsigned int height = pImage->GetHeight();
-
-            if (pImage->IsIncomplete())
+            if (ioctl(video_fd, VIDIOC_S_FMT, &vfmt) < 0)
             {
-                std::cerr << "Image incomplete: " << pImage->GetImageStatus() << std::endl;
-                continue;
+                std::cerr << "[spinnaker stream] Failed to set video format on virtual device" << std::endl;
+                break;
             }
-
-            // Print the pixel format only once
-            if (!pixel_format_printed)
+        
+            // Set the frame rate
+            struct v4l2_streamparm streamparm = {};
+            streamparm.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+            streamparm.parm.output.timeperframe.numerator = 1;
+            streamparm.parm.output.timeperframe.denominator = 60;
+            if (ioctl(video_fd, VIDIOC_S_PARM, &streamparm) < 0)
             {
-                std::cout << "Captured pixel format: " << pixel_format_to_string(pImage->GetPixelFormat()) << std::endl;
-                std::cout << "Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
-                std::cout << "Converting to YUYV422 format..." << std::endl;
-                pixel_format_printed = true;
-            }
-
-            // Handle BayerRG8 format: Convert BayerRG8 to RGB8
-            static unsigned char *imageData = nullptr;
-            imageData = static_cast<unsigned char *>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->GetData());
-
-            // Convert RGB24 to YUYV422
-            static auto *yuyv422 = new unsigned char[width * height * 2];
-            convert_rgb24_to_yuyv_cuda(imageData, yuyv422, width, height);
-
-            // Configure the virtual video device for YUYV422
-            if (!is_configured)
-            {
-                if (configure_video_device(video_fd, width, height, V4L2_PIX_FMT_YUYV) != 0)
-                {
-                    std::cerr << "Failed to configure virtual device" << std::endl;
-                    break;
-                }
-                is_configured = true;
-            }
-
-            // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
-            if (write(video_fd, yuyv422, width * height * 2) == -1)
-            {
-                std::cerr << "Error writing frame to virtual device" << std::endl;
+                std::cerr << "[spinnaker stream] Failed to set frame rate" << std::endl;
                 break;
             }
 
-            pImage->Release();
+            // Initialize CUDA and allocate memory for YUYV422 format
+            init_rgb2yuyv_cuda(width, height, CUDA_STREAMS);
+            yuyv422 = get_cuda_buffer(width * height * 2);
+            
+            std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
+            is_init = true;
         }
 
-        cleanup_cuda_buffers();
-        camera->EndAcquisition();
-        camera->DeInit();
-        camList.Clear();
-        system->ReleaseInstance();
+        // Handle BayerRG8 format: Convert BayerRG8 to RGB8
+        imageData = static_cast<unsigned char*>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->
+                                                        GetData());
 
-        close(video_fd);
+        // Add components to the image
+        if (is_sensor_connected)
+        {
+            if (!is_sensor_init)
+            {
+                buffer = new char[BUFFER_SIZE];
+                stream_image = std::make_unique<StreamImage>(width, height);
+                prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
+                                                                   "homography_calibration.yaml", width, height);
+                velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
+                latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
+                str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, BUFFER_SIZE, bufferMutex);
+                vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
+                ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
+                sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex),
+                                            std::ref(thread_signal), std::ref(is_thread_running));
+                stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
+                stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
+                stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
+                latency_label->update("Latency: 0 ms");
+                is_sensor_init = true;
+            }
+            prediction_line->update(vel->get_value() * 3.6f, ax->get_value(), str_whe_phi->get_value(), str_whe_phi->get_value(), 0.0);
+            velocity->update(to_string(static_cast<int>(vel->get_value() * 3.6f)));
+            *stream_image >> imageData;
+        }
+
+        // Convert RGB24 to YUYV422
+        rgb2yuyv_cuda(imageData, yuyv422);
+
+        // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
+        if (write(video_fd, yuyv422, width * height * 2) == -1)
+        {
+            std::cerr << "[spinnaker stream] Error writing frame to virtual device" << std::endl;
+            break;
+        }
+
+        pImage->Release();
     }
+
+    // Cleanup
+    if (is_sensor_init)
+    {
+        thread_signal = true;
+        if (sensor_thread.joinable())
+        {
+            int count = 0;
+            while (is_thread_running && count++ < 30)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            if (is_thread_running)
+            {
+                std::cerr << "[spinnaker stream] Sensor thread did not exit gracefully" << std::endl;
+                sensor_thread.detach();
+            }
+            else
+            {
+                sensor_thread.join();
+            }
+        }
+        thread_signal = false;
+        delete[] buffer;
+        buffer = nullptr;
+        delete bridge;
+        bridge = nullptr;
+        is_sensor_init = false;
+    }
+    if (is_init)
+    {
+        imageData = nullptr;
+        free_cuda_buffer(yuyv422);
+        cleanup_rgb2yuyv_cuda();
+        is_init = false;
+    }
+    pImage = nullptr;
+    camera->EndAcquisition();
+    camera->DeInit();
+    camera = nullptr;
+    camList.Clear();
+    system_c->ReleaseInstance();
+    system_c = nullptr;
+    close(video_fd);
 }
