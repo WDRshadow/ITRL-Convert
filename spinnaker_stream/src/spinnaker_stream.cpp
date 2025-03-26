@@ -8,6 +8,8 @@
 
 #include "spinnaker_stream.h"
 #include "component.h"
+#include "cuda_buffer.h"
+#include "bayerRG2rgb.h"
 #include "rgb2yuyv.h"
 #include "socket_bridge.h"
 #include "sensor.h"
@@ -27,6 +29,7 @@ bool is_sensor_init = false;
 bool thread_signal = false;
 bool is_thread_running = false;
 unsigned char* imageData = nullptr;
+unsigned char* rgb24 = nullptr;
 unsigned char* yuyv422 = nullptr;
 std::thread sensor_thread;
 
@@ -135,7 +138,9 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
             }
 
             // Initialize CUDA and allocate memory for YUYV422 format
+            init_bayerRG2rgb_cuda(width, height, CUDA_STREAMS);
             init_rgb2yuyv_cuda(width, height, CUDA_STREAMS);
+            rgb24 = get_cuda_buffer(width * height * 3);
             yuyv422 = get_cuda_buffer(width * height * 2);
             
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
@@ -143,8 +148,8 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         }
 
         // Handle BayerRG8 format: Convert BayerRG8 to RGB8
-        imageData = static_cast<unsigned char*>(pImage->Convert(Spinnaker::PixelFormatEnums::PixelFormat_RGB8)->
-                                                        GetData());
+        imageData = static_cast<unsigned char*>(pImage->GetData());
+        bayerRG2rgb_cuda(imageData, rgb24);
 
         // Add components to the image
         if (is_sensor_connected)
@@ -170,11 +175,11 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
             }
             prediction_line->update(vel->get_value() * 3.6f, ax->get_value(), str_whe_phi->get_value(), str_whe_phi->get_value(), 0.0);
             velocity->update(to_string(static_cast<int>(vel->get_value() * 3.6f)));
-            *stream_image >> imageData;
+            *stream_image >> rgb24;
         }
 
         // Convert RGB24 to YUYV422
-        rgb2yuyv_cuda(imageData, yuyv422);
+        rgb2yuyv_cuda(rgb24, yuyv422);
 
         // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
         if (write(video_fd, yuyv422, width * height * 2) == -1)
@@ -217,8 +222,12 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     if (is_init)
     {
         imageData = nullptr;
+        free_cuda_buffer(rgb24);
+        rgb24 = nullptr;
         free_cuda_buffer(yuyv422);
+        yuyv422 = nullptr;
         cleanup_rgb2yuyv_cuda();
+        cleanup_bayerRG2rgb_cuda();
         is_init = false;
     }
     pImage = nullptr;
