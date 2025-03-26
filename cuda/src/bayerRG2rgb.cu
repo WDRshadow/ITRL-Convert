@@ -180,6 +180,8 @@ void cleanup_bayerRG2rgb_cuda()
     free(bayerRG2rgb_streams);
     bayerRG2rgb_streams = nullptr;
     cudaFree(bayerRG2rgb_d_bayer);
+    bayerRG2rgb_d_bayer = nullptr;
     cudaFree(bayerRG2rgb_d_rgb);
+    bayerRG2rgb_d_rgb = nullptr;
     is_bayerRG2rgb_cuda_initialized = false;
 }

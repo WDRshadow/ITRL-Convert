@@ -1,6 +1,10 @@
 #ifndef BAYER_RG2RGB_H
 #define BAYER_RG2RGB_H
 
+#ifdef __CUDACC__
+__global__ void bayerRG2rgb_kernel(const unsigned char *bayer, unsigned char *rgb, int width, int height);
+#endif
+
 /**
  * Initialize CUDA buffers.
  *

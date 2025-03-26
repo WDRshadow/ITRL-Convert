@@ -8,9 +8,7 @@
 
 #include "spinnaker_stream.h"
 #include "component.h"
-#include "cuda_buffer.h"
-#include "bayerRG2rgb.h"
-#include "rgb2yuyv.h"
+#include "cuda_stream.h"
 #include "socket_bridge.h"
 #include "sensor.h"
 
@@ -29,7 +27,6 @@ bool is_sensor_init = false;
 bool thread_signal = false;
 bool is_thread_running = false;
 unsigned char* imageData = nullptr;
-unsigned char* rgb24 = nullptr;
 unsigned char* yuyv422 = nullptr;
 std::thread sensor_thread;
 
@@ -138,48 +135,43 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
             }
 
             // Initialize CUDA and allocate memory for YUYV422 format
-            init_bayerRG2rgb_cuda(width, height, CUDA_STREAMS);
-            init_rgb2yuyv_cuda(width, height, CUDA_STREAMS);
-            rgb24 = get_cuda_buffer(width * height * 3);
+            init_bayer2yuyv_cuda(width, height, CUDA_STREAMS);
             yuyv422 = get_cuda_buffer(width * height * 2);
             
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
             is_init = true;
         }
 
-        // Handle BayerRG8 format: Convert BayerRG8 to RGB8
+        // Handle BayerRG8 format: Convert BayerRG8 to YUYV
         imageData = static_cast<unsigned char*>(pImage->GetData());
-        bayerRG2rgb_cuda(imageData, rgb24);
+        bayer2yuyv_cuda(imageData, yuyv422);
 
         // Add components to the image
-        if (is_sensor_connected)
-        {
-            if (!is_sensor_init)
-            {
-                buffer = new char[BUFFER_SIZE];
-                stream_image = std::make_unique<StreamImage>(width, height);
-                prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
-                                                                   "homography_calibration.yaml", width, height);
-                velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
-                latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
-                str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, BUFFER_SIZE, bufferMutex);
-                vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
-                ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
-                sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex),
-                                            std::ref(thread_signal), std::ref(is_thread_running));
-                stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
-                stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
-                stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
-                latency_label->update("Latency: 0 ms");
-                is_sensor_init = true;
-            }
-            prediction_line->update(vel->get_value() * 3.6f, ax->get_value(), str_whe_phi->get_value(), str_whe_phi->get_value(), 0.0);
-            velocity->update(to_string(static_cast<int>(vel->get_value() * 3.6f)));
-            *stream_image >> rgb24;
-        }
-
-        // Convert RGB24 to YUYV422
-        rgb2yuyv_cuda(rgb24, yuyv422);
+        // if (is_sensor_connected)
+        // {
+        //     if (!is_sensor_init)
+        //     {
+        //         buffer = new char[BUFFER_SIZE];
+        //         stream_image = std::make_unique<StreamImage>(width, height);
+        //         prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
+        //                                                            "homography_calibration.yaml", width, height);
+        //         velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
+        //         latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
+        //         str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, BUFFER_SIZE, bufferMutex);
+        //         vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
+        //         ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
+        //         sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex),
+        //                                     std::ref(thread_signal), std::ref(is_thread_running));
+        //         stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
+        //         stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
+        //         stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
+        //         latency_label->update("Latency: 0 ms");
+        //         is_sensor_init = true;
+        //     }
+        //     prediction_line->update(vel->get_value() * 3.6f, ax->get_value(), str_whe_phi->get_value(), str_whe_phi->get_value(), 0.0);
+        //     velocity->update(to_string(static_cast<int>(vel->get_value() * 3.6f)));
+        //     *stream_image >> rgb24;
+        // }
 
         // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
         if (write(video_fd, yuyv422, width * height * 2) == -1)
@@ -222,12 +214,9 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     if (is_init)
     {
         imageData = nullptr;
-        free_cuda_buffer(rgb24);
-        rgb24 = nullptr;
         free_cuda_buffer(yuyv422);
         yuyv422 = nullptr;
-        cleanup_rgb2yuyv_cuda();
-        cleanup_bayerRG2rgb_cuda();
+        cleanup_bayer2yuyv_cuda();
         is_init = false;
     }
     pImage = nullptr;

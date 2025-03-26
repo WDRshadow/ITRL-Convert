@@ -10,7 +10,7 @@ set(CMAKE_CUDA_ARCHITECTURES 72)
 add_library(cuda
         STATIC
         src/rgb2yuyv.cu
-        src/cuda_buffer.cu
+        src/cuda_stream.cu
         src/bayerRG2rgb.cu
 )
 

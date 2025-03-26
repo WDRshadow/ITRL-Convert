@@ -1,6 +1,10 @@
 #ifndef RGB2YUYV_H
 #define RGB2YUYV_H
 
+#ifdef __CUDACC__
+__global__ void rgb2yuyv_kernel(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height);
+#endif
+
 /**
  * Initialize CUDA buffers.
  *
