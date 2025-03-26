@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
         std::cout << "[main] Usage: " << argv[0] << " [-d <video_device>] [-s [-ip <ip>] [-p <port>]]" << std::endl;
         std::cout << "[main] Options:" << std::endl;
         std::cout << "[main]   -d <video_device>    Specify the video device to capture frames from (default: /dev/video16)" << std::endl;
-        std::cout << "[main]   -s                   Enable streaming mode" << std::endl;
+        std::cout << "[main]   -s                   Add the sensor data to the video stream" << std::endl;
         std::cout << "[main]   -ip <ip>             Specify the IP address to stream frames to (default: 0.0.0.0)" << std::endl;
         std::cout << "[main]   -p <port>            Specify the port to stream frames to (default: 10086)" << std::endl;
         std::cout << "[main]   -fc                  Run fisheye calibration" << std::endl;

@@ -27,8 +27,6 @@ public:
 
 class Component
 {
-    friend class StreamImage;
-
 public:
     virtual ~Component() = default;
     virtual void operator>>(Mat& imageData) const = 0;
@@ -36,8 +34,6 @@ public:
 
 class ImageComponent : public Component
 {
-    friend class StreamImage;
-
 protected:
     const int cx;
     const int cy;
