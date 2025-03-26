@@ -73,7 +73,7 @@ class PredictionLine final : public LineComponent
 {
 public:
     PredictionLine(const string& fisheye_config, const string& homography_config, int width, int height);
-    void update(float v, float a, float str_whe_phi, float latency);
+    void update(float v, float a, float str_whe_phi_remote, float str_whe_phi_local, float latency);
 };
 
 class TextComponent final : public ImageComponent

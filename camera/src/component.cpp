@@ -92,9 +92,9 @@ PredictionLine::PredictionLine(const string& fisheye_config, const string& homog
 {
 }
 
-void PredictionLine::update(const float v, const float a, const float str_whe_phi, const float latency)
+void PredictionLine::update(const float v, const float a, float str_whe_phi_remote, const float str_whe_phi_local, const float latency)
 {
-    const double omega = bycicleModel(v, str_whe_phi / 20.0f, RCVE_WHBASE, RCVE_RATIO);
+    const double omega = bycicleModel(v, str_whe_phi_remote / 20.0f, RCVE_WHBASE, RCVE_RATIO);
     const auto [x, y, theta] = predictCYRA(v, a, omega, THETA0, latency);
     vector<Point2f> lines = create_line({
                                             static_cast<float>(1536 + y * 25),
@@ -108,7 +108,7 @@ void PredictionLine::update(const float v, const float a, const float str_whe_ph
     const float y_l = 2047 - static_cast<float>(x) * 25 - 25 * sin_theta;
     const float x_r = 1536 + static_cast<float>(y) * 25 + 25 * cos_theta;
     const float y_r = 2047 - static_cast<float>(x) * 25 + 25 * sin_theta;
-    const float angle = str_whe_phi / 4.1f;
+    const float angle = str_whe_phi_local / 4.1f;
     const vector<Point2f> line_left = create_curve(
         {x_l, y_l},
         {x_l + 384 * sin_theta, y_l - 384 * cos_theta},
