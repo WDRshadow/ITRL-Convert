@@ -1,0 +1,32 @@
+#ifndef RGB2YUYV_H
+#define RGB2YUYV_H
+
+#ifdef __CUDACC__
+__global__ void rgb2yuyv_kernel(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height);
+#endif
+
+/**
+ * Initialize CUDA buffers.
+ *
+ * @param width Width of the image
+ * @param height Height of the image
+ * @param stream_num Number of CUDA streams
+ */
+void init_rgb2yuyv_cuda(unsigned int width, unsigned int height, int stream_num);
+
+/**
+ * Convert RGB24 to YUYV422 with CUDA. 
+ *
+ * Fixed-point arithmetic optimization is used to speed up the calculation.
+ *
+ * @param rgb24 RGB24 data
+ * @param yuyv422 YUYV422 data (output)
+ */
+void rgb2yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422);
+
+/**
+ * Cleanup CUDA buffers.
+ */
+void cleanup_rgb2yuyv_cuda();
+
+#endif // RGB2YUYV_H
