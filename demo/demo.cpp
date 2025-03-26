@@ -5,7 +5,33 @@
 #include "component.h"
 #include "demo_sensor.h"
 
-using namespace std;
+class RingBuffer
+{
+    Mat* buffer = new Mat[25];
+    int current = 0;
+
+public:
+    ~RingBuffer()
+    {
+        delete[] buffer;
+    }
+
+    [[nodiscard]] Mat* get_newest()
+    {
+        return buffer + current;
+    }
+
+    [[nodiscard]] Mat* get_oldest() const
+    {
+        return buffer + (current + 2) % 25;
+    }
+
+    void operator<<(VideoCapture& cap)
+    {
+        cap >> buffer[(current + 1) % 25];
+        current = (current + 1) % 25;
+    }
+};
 
 int main()
 {
@@ -15,7 +41,9 @@ int main()
         cerr << "[demo] cannot open the video file" << endl;
         return -1;
     }
-    Mat frame;
+
+    RingBuffer buffer;
+    Mat* previous = nullptr;
 
     const demo_sensor str_whe_phi("data/str_whe_phi.csv");
     const demo_sensor vel("data/vel.csv");
@@ -40,31 +68,38 @@ int main()
     constexpr float latency = 0.5;
     demo_label->update("Demo");
     latency_label->update("Latency: " + to_string(static_cast<int>(latency * 1000)) + " ms");
-    cap.set(CAP_PROP_POS_FRAMES, 8000 - static_cast<int>(latency * 51));
+    cap.set(CAP_PROP_POS_FRAMES, 8000);
     constexpr int start = 15293;
+    int count = 0;
     while (true)
     {
-        static int count = 0;
         int index = interpolation_51_100(count++);
         if (start + index >= str_whe_phi.size())
-        {
-            break;
-        }
-        cap >> frame;
-        if (frame.empty())
         {
             break;
         }
         // component update -----------------------------------
         prediction_line->update(vel.get_value(start + index - static_cast<int>(latency * 100)) * 3.6f,
                                 ax.get_value(start + index - static_cast<int>(latency * 100)),
+                                str_whe_phi.get_value(start + index - static_cast<int>(latency * 100)),
                                 str_whe_phi.get_value(start + index), latency);
         velocity->update(to_string(static_cast<int>(vel.get_value(start + index) * 3.6f)));
-        stream_image >> frame;
         // ----------------------------------------------------
-        imshow("frame", frame);
+        buffer << cap;
+        previous = buffer.get_oldest();
+        if (buffer.get_newest()->empty())
+        {
+            break;
+        }
+        if (!previous->empty())
+        {
+            stream_image >> *previous;
+            imshow("frame", *previous);
+        }
+        // imshow("frame2", *buffer.get_newest());
         waitKey(20);
     }
     destroyWindow("frame");
+    destroyWindow("frame2");
     return 1;
 }

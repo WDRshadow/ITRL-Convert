@@ -168,7 +168,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
                 latency_label->update("Latency: 0 ms");
                 is_sensor_init = true;
             }
-            prediction_line->update(vel->get_value() * 3.6f, ax->get_value(), str_whe_phi->get_value(), 0.0);
+            prediction_line->update(vel->get_value() * 3.6f, ax->get_value(), str_whe_phi->get_value(), str_whe_phi->get_value(), 0.0);
             velocity->update(to_string(static_cast<int>(vel->get_value() * 3.6f)));
             *stream_image >> imageData;
         }
