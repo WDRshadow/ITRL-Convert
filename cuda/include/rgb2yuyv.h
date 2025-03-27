@@ -1,6 +1,10 @@
 #ifndef RGB2YUYV_H
 #define RGB2YUYV_H
 
+#ifdef __CUDACC__
+__global__ void rgb2yuyv_kernel(const unsigned char *rgb24, unsigned char *yuyv422, unsigned int width, unsigned int height);
+#endif
+
 /**
  * Initialize CUDA buffers.
  *
@@ -24,18 +28,5 @@ void rgb2yuyv_cuda(const unsigned char *rgb24, unsigned char *yuyv422);
  * Cleanup CUDA buffers.
  */
 void cleanup_rgb2yuyv_cuda();
-
-/**
- * Use cudaHostAlloc to allocate a pinned memory buffer.
- *
- * @param size Size of the buffer
- * @return Pointer to the buffer
- */
-unsigned char *get_cuda_buffer(size_t size);
-
-/**
- * Free the CUDA buffer.
- */
-void free_cuda_buffer(unsigned char *buffer);
 
 #endif // RGB2YUYV_H
