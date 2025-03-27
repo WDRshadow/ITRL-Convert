@@ -1,5 +1,5 @@
-#ifndef CUDA_BUFFER_H
-#define CUDA_BUFFER_H
+#ifndef CUDA_STREAM_H
+#define CUDA_STREAM_H
 
 /**
  * Initialize CUDA buffers.
@@ -36,4 +36,4 @@ unsigned char *get_cuda_buffer(size_t size);
  */
 void free_cuda_buffer(unsigned char *buffer);
 
-#endif // CUDA_BUFFER_H
+#endif // CUDA_STREAM_H

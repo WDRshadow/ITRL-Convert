@@ -137,19 +137,24 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
                 break;
             }
 
-            // Initialize CUDA and allocate memory for YUYV422 format
-            init_bayerRG2rgb_cuda(width, height, CUDA_STREAMS);
-            init_rgb2yuyv_cuda(width, height, CUDA_STREAMS);
-            rgb24 = get_cuda_buffer(width * height * 3);
+            // Initialize CUDA and allocate memory for
+            if (is_sensor_connected)
+            {
+                init_bayerRG2rgb_cuda(width, height, CUDA_STREAMS);
+                init_rgb2yuyv_cuda(width, height, CUDA_STREAMS);
+                rgb24 = get_cuda_buffer(width * height * 3);
+            }
+            else
+            {
+                init_bayer2yuyv_cuda(width, height, CUDA_STREAMS);
+            }
             yuyv422 = get_cuda_buffer(width * height * 2);
             
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
             is_init = true;
         }
 
-        // Handle BayerRG8 format: Convert BayerRG8 to RGB24
         imageData = static_cast<unsigned char*>(pImage->GetData());
-        bayerRG2rgb_cuda(imageData, rgb24);
 
         // Add components to the image
         if (is_sensor_connected)
@@ -173,13 +178,20 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
                 latency_label->update("Latency: 0 ms");
                 is_sensor_init = true;
             }
+            // Handle BayerRG8 format: Convert BayerRG8 to RGB24
+            bayerRG2rgb_cuda(imageData, rgb24);
             prediction_line->update(vel->get_value() * 3.6f, ax->get_value(), str_whe_phi->get_value(), str_whe_phi->get_value(), 0.0);
             velocity->update(to_string(static_cast<int>(vel->get_value() * 3.6f)));
             *stream_image >> rgb24;
+            // Handle RGB24 format: Convert RGB24 to YUYV422
+            rgb2yuyv_cuda(rgb24, yuyv422);
+        }
+        else
+        {
+            // Handle BayerRG8 format: Convert BayerRG8 to YUYV422
+            bayer2yuyv_cuda(imageData, yuyv422);
         }
 
-        // Handle RGB24 format: Convert RGB24 to YUYV422
-        rgb2yuyv_cuda(rgb24, yuyv422);
 
         // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
         if (write(video_fd, yuyv422, width * height * 2) == -1)
