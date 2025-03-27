@@ -1,6 +1,2 @@
 .vscode/
 build/
-test/
-*.yaml
-*.o
-*.a

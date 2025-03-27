@@ -1,8 +1,9 @@
 #include <iostream>
 #include <gtest/gtest.h>
 
-#include "bayerRG2rgb.h"
+#include "bayer2rgb.h"
 #include "rgb2yuyv.h"
+#include "bayer2yuyv.h"
 #include "cuda_stream.h"
 
 int main(int argc, char **argv)
@@ -41,9 +42,9 @@ TEST(CUDA, BAYER_RGB)
         bayerHost[i] = static_cast<unsigned char>(rand() % 256);
     }
     
-    init_bayerRG2rgb_cuda(width, height, 8);
-    bayerRG2rgb_cuda(bayerHost, rgbHost);
-    cleanup_bayerRG2rgb_cuda();
+    init_bayer2rgb_cuda(width, height, 8);
+    bayer2rgb_cuda(bayerHost, rgbHost);
+    cleanup_bayer2rgb_cuda();
 
     std::cout << "[cuda] Conversion done. Output RGB size = " << width * height * 3 << " bytes." << std::endl;
 

@@ -1,21 +1,21 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
 
-#include "bayerRG2rgb.h"
+#include "bayer2rgb.h"
 
-bool is_bayerRG2rgb_cuda_initialized = false;
-int bayerRG2rgb_stream_num_;
-cudaStream_t *bayerRG2rgb_streams = nullptr;
-unsigned int bayerRG2rgb_width_;
-unsigned int bayerRG2rgb_height_;
-unsigned int bayerRG2rgb_block_height;
-size_t bayerRG2rgb_size_bayer_block;
-size_t bayerRG2rgb_size_rgb_block;
-unsigned char *bayerRG2rgb_d_bayer = nullptr;
-unsigned char *bayerRG2rgb_d_rgb = nullptr;
+bool is_bayer2rgb_cuda_initialized = false;
+int bayer2rgb_stream_num_;
+cudaStream_t *bayer2rgb_streams = nullptr;
+unsigned int bayer2rgb_width_;
+unsigned int bayer2rgb_height_;
+unsigned int bayer2rgb_block_height;
+size_t bayer2rgb_size_bayer_block;
+size_t bayer2rgb_size_rgb_block;
+unsigned char *bayer2rgb_d_bayer = nullptr;
+unsigned char *bayer2rgb_d_rgb = nullptr;
 
-const dim3 bayerRG2rgb_blockSize(32, 16);
-dim3 bayerRG2rgb_gridSize;
+const dim3 bayer2rgb_blockSize(32, 16);
+dim3 bayer2rgb_gridSize;
 
 __device__ inline float getBayerVal(const unsigned char *bayer, int x, int y, int width, int height)
 {
@@ -33,30 +33,30 @@ __device__ inline unsigned char clampToByte(float val)
     return static_cast<unsigned char>(val + 0.5f);
 }
 
-void init_bayerRG2rgb_cuda(unsigned int width, unsigned int height, int stream_num)
+void init_bayer2rgb_cuda(unsigned int width, unsigned int height, int stream_num)
 {
-    if (is_bayerRG2rgb_cuda_initialized)
+    if (is_bayer2rgb_cuda_initialized)
     {
-        cleanup_bayerRG2rgb_cuda();
+        cleanup_bayer2rgb_cuda();
     }
-    bayerRG2rgb_width_ = width;
-    bayerRG2rgb_height_ = height;
-    bayerRG2rgb_stream_num_ = stream_num;
-    bayerRG2rgb_block_height = height / stream_num;
-    bayerRG2rgb_size_bayer_block = width * bayerRG2rgb_block_height;
-    bayerRG2rgb_size_rgb_block = width * bayerRG2rgb_block_height * 3;
-    bayerRG2rgb_gridSize = dim3((width + bayerRG2rgb_blockSize.x - 1) / bayerRG2rgb_blockSize.x, (bayerRG2rgb_block_height + bayerRG2rgb_blockSize.y - 1) / bayerRG2rgb_blockSize.y);
-    bayerRG2rgb_streams = (cudaStream_t *)malloc(stream_num * sizeof(cudaStream_t));
+    bayer2rgb_width_ = width;
+    bayer2rgb_height_ = height;
+    bayer2rgb_stream_num_ = stream_num;
+    bayer2rgb_block_height = height / stream_num;
+    bayer2rgb_size_bayer_block = width * bayer2rgb_block_height;
+    bayer2rgb_size_rgb_block = width * bayer2rgb_block_height * 3;
+    bayer2rgb_gridSize = dim3((width + bayer2rgb_blockSize.x - 1) / bayer2rgb_blockSize.x, (bayer2rgb_block_height + bayer2rgb_blockSize.y - 1) / bayer2rgb_blockSize.y);
+    bayer2rgb_streams = (cudaStream_t *)malloc(stream_num * sizeof(cudaStream_t));
     for (int i = 0; i < stream_num; i++)
     {
-        cudaStreamCreate(&bayerRG2rgb_streams[i]);
+        cudaStreamCreate(&bayer2rgb_streams[i]);
     }
-    cudaMalloc((void **)&bayerRG2rgb_d_bayer, width * height);
-    cudaMalloc((void **)&bayerRG2rgb_d_rgb, width * height * 3);
-    is_bayerRG2rgb_cuda_initialized = true;
+    cudaMalloc((void **)&bayer2rgb_d_bayer, width * height);
+    cudaMalloc((void **)&bayer2rgb_d_rgb, width * height * 3);
+    is_bayer2rgb_cuda_initialized = true;
 }
 
-__global__ void bayerRG2rgb_kernel(const unsigned char *bayer, unsigned char *rgb, int width, int height)
+__global__ void bayer2rgb_kernel(const unsigned char *bayer, unsigned char *rgb, int width, int height)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -136,52 +136,52 @@ __global__ void bayerRG2rgb_kernel(const unsigned char *bayer, unsigned char *rg
     rgb[out_idx + 2] = clampToByte(B);
 }
 
-void bayerRG2rgb_cuda(const unsigned char *bayerHost, unsigned char *rgbHost)
+void bayer2rgb_cuda(const unsigned char *bayerHost, unsigned char *rgbHost)
 {
-    if (!is_bayerRG2rgb_cuda_initialized)
+    if (!is_bayer2rgb_cuda_initialized)
     {
         return;
     }
-    for (int i = 0; i < bayerRG2rgb_stream_num_; i++)
+    for (int i = 0; i < bayer2rgb_stream_num_; i++)
     {
         cudaMemcpyAsync(
-            bayerRG2rgb_d_bayer + i * bayerRG2rgb_size_bayer_block,
-            bayerHost + i * bayerRG2rgb_size_bayer_block,
-            bayerRG2rgb_size_bayer_block,
+            bayer2rgb_d_bayer + i * bayer2rgb_size_bayer_block,
+            bayerHost + i * bayer2rgb_size_bayer_block,
+            bayer2rgb_size_bayer_block,
             cudaMemcpyHostToDevice,
-            bayerRG2rgb_streams[i]);
+            bayer2rgb_streams[i]);
 
-        bayerRG2rgb_kernel<<<bayerRG2rgb_gridSize, bayerRG2rgb_blockSize, 0, bayerRG2rgb_streams[i]>>>(
-            bayerRG2rgb_d_bayer + i * bayerRG2rgb_size_bayer_block,
-            bayerRG2rgb_d_rgb + i * bayerRG2rgb_size_rgb_block,
-            bayerRG2rgb_width_,
-            bayerRG2rgb_block_height);
+        bayer2rgb_kernel<<<bayer2rgb_gridSize, bayer2rgb_blockSize, 0, bayer2rgb_streams[i]>>>(
+            bayer2rgb_d_bayer + i * bayer2rgb_size_bayer_block,
+            bayer2rgb_d_rgb + i * bayer2rgb_size_rgb_block,
+            bayer2rgb_width_,
+            bayer2rgb_block_height);
 
         cudaMemcpyAsync(
-            rgbHost + i * bayerRG2rgb_size_rgb_block,
-            bayerRG2rgb_d_rgb + i * bayerRG2rgb_size_rgb_block,
-            bayerRG2rgb_size_rgb_block,
+            rgbHost + i * bayer2rgb_size_rgb_block,
+            bayer2rgb_d_rgb + i * bayer2rgb_size_rgb_block,
+            bayer2rgb_size_rgb_block,
             cudaMemcpyDeviceToHost,
-            bayerRG2rgb_streams[i]);
+            bayer2rgb_streams[i]);
     }
     cudaDeviceSynchronize();
 }
 
-void cleanup_bayerRG2rgb_cuda()
+void cleanup_bayer2rgb_cuda()
 {
-    if (!is_bayerRG2rgb_cuda_initialized)
+    if (!is_bayer2rgb_cuda_initialized)
     {
         return;
     }
-    for (int i = 0; i < bayerRG2rgb_stream_num_; i++)
+    for (int i = 0; i < bayer2rgb_stream_num_; i++)
     {
-        cudaStreamDestroy(bayerRG2rgb_streams[i]);
+        cudaStreamDestroy(bayer2rgb_streams[i]);
     }
-    free(bayerRG2rgb_streams);
-    bayerRG2rgb_streams = nullptr;
-    cudaFree(bayerRG2rgb_d_bayer);
-    bayerRG2rgb_d_bayer = nullptr;
-    cudaFree(bayerRG2rgb_d_rgb);
-    bayerRG2rgb_d_rgb = nullptr;
-    is_bayerRG2rgb_cuda_initialized = false;
+    free(bayer2rgb_streams);
+    bayer2rgb_streams = nullptr;
+    cudaFree(bayer2rgb_d_bayer);
+    bayer2rgb_d_bayer = nullptr;
+    cudaFree(bayer2rgb_d_rgb);
+    bayer2rgb_d_rgb = nullptr;
+    is_bayer2rgb_cuda_initialized = false;
 }

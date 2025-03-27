@@ -8,8 +8,9 @@
 
 #include "spinnaker_stream.h"
 #include "component.h"
-#include "bayerRG2rgb.h"
+#include "bayer2rgb.h"
 #include "rgb2yuyv.h"
+#include "bayer2yuyv.h"
 #include "cuda_stream.h"
 #include "socket_bridge.h"
 #include "sensor.h"
@@ -140,7 +141,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
             // Initialize CUDA and allocate memory for
             if (is_sensor_connected)
             {
-                init_bayerRG2rgb_cuda(width, height, CUDA_STREAMS);
+                init_bayer2rgb_cuda(width, height, CUDA_STREAMS);
                 init_rgb2yuyv_cuda(width, height, CUDA_STREAMS);
                 rgb24 = get_cuda_buffer(width * height * 3);
             }
@@ -179,7 +180,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
                 is_sensor_init = true;
             }
             // Handle BayerRG8 format: Convert BayerRG8 to RGB24
-            bayerRG2rgb_cuda(imageData, rgb24);
+            bayer2rgb_cuda(imageData, rgb24);
             prediction_line->update(vel->get_value() * 3.6f, ax->get_value(), str_whe_phi->get_value(), str_whe_phi->get_value(), 0.0);
             velocity->update(to_string(static_cast<int>(vel->get_value() * 3.6f)));
             *stream_image >> rgb24;
@@ -238,7 +239,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         rgb24 = nullptr;
         free_cuda_buffer(yuyv422);
         yuyv422 = nullptr;
-        cleanup_bayerRG2rgb_cuda();
+        cleanup_bayer2rgb_cuda();
         cleanup_rgb2yuyv_cuda();
         is_init = false;
     }
