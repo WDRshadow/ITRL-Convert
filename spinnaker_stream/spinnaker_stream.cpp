@@ -21,7 +21,7 @@ Spinnaker::ImagePtr pImage = nullptr;
 unsigned char* imageData = nullptr;
 unsigned char* yuyv422 = nullptr;
 
-void capture_frames(const char* video_device)
+void capture_frames(const char* video_device, bool& signal)
 {
     // Open the virtual V4L2 device
     video_fd = open(video_device, O_WRONLY);

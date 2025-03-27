@@ -11,7 +11,7 @@ bool capture_signal = false;
 
 void run_spinnaker_stream(const char* videoDevice) {
     std::cout << "[main] Starting to capture frames from the FLIR camera..." << std::endl;
-    capture_frames(videoDevice);
+    capture_frames(videoDevice, capture_signal);
     std::cout << "[main] Capture process finished" << std::endl;
 }
 
