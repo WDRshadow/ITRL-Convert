@@ -53,12 +53,13 @@ The conversion is implemented using sequential processing, parallel processing, 
 
     Note: The test device is NVIDIA Jetson AGX Xavier (32G).
 
-|  Processing Type  | Time (ms) |
-|-------------------|-----------|
-| Bayer to RGB only | 8.7       |
-| Sequential        | 47.6      |
-| Parallel          | 16.0      |
-| CUDA              | 16.0      |
+|  Processing Type       | Time (ms) |
+|------------------------|-----------|
+| Bayer to RGB only      | 8.7       |
+| Sequential             | 47.6      |
+| Parallel               | 16.0      |
+| CUDA (pure stream)     | 8.0       |
+| CUDA (with components) | 10.0      |
 
 # Fisheye criteria
 
