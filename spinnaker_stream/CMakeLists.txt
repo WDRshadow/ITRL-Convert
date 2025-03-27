@@ -4,14 +4,14 @@ set(CMAKE_CXX_STANDARD 17)
 
 add_library(spinnaker_stream
         STATIC
-        src/spinnaker_stream.cpp
+        spinnaker_stream.cpp
 )
 
 target_include_directories(spinnaker_stream
         PUBLIC
-        include
         /usr/include/spinnaker
-        ${CMAKE_SOURCE_DIR}/rgb2yuyv/include
+        .
+        ${CMAKE_SOURCE_DIR}/cuda/include
 )
 
 set_target_properties(spinnaker_stream PROPERTIES
