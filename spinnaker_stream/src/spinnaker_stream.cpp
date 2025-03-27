@@ -96,9 +96,6 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     {
         pImage = camera->GetNextImage();
 
-        //timer
-        auto start = std::chrono::high_resolution_clock::now();
-
         if (pImage->IsIncomplete())
         {
             std::cerr << "[spinnaker stream] Image incomplete: " << pImage->GetImageStatus() << std::endl;
@@ -190,11 +187,6 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
             std::cerr << "[spinnaker stream] Error writing frame to virtual device" << std::endl;
             break;
         }
-
-        //timer in ms plotting
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double, std::milli> elapsed = end - start;
-        std::cout << "Time taken to process frame: " << elapsed.count() << " ms" << std::endl;
 
         pImage->Release();
     }
