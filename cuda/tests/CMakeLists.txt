@@ -15,6 +15,6 @@ target_include_directories(cuda_test
         ../include
 )
 
-target_link_libraries(cuda_test gtest_main cuda)
+target_link_libraries(cuda_test gtest_main cuda_l)
 
 add_test(NAME cuda_test COMMAND cuda_test)

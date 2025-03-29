@@ -22,4 +22,4 @@ target_include_directories(rcve_stream
         ${OpenCV_INCLUDE_DIRS}
 )
 
-target_link_libraries(rcve_stream ${OpenCV_LIBS} spinnaker_stream sensor cuda camera Spinnaker motion)
+target_link_libraries(rcve_stream ${OpenCV_LIBS} spinnaker_stream sensor cuda_l camera Spinnaker motion)
