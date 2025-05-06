@@ -1,9 +1,10 @@
 #include <iostream>
+#include <kbm.h>
 #include <gtest/gtest.h>
 
 #include "cyra.h"
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
@@ -38,4 +39,10 @@ TEST(MOTION, BYCICLE)
     std::cout << "x = " << predicted.x << " m" << std::endl;
     std::cout << "y = " << predicted.y << " m" << std::endl;
     std::cout << "theta = " << predicted.theta << " rad" << std::endl;
+}
+
+TEST(MOTION, KBM)
+{
+    double angle = -0.07;
+    std::vector<cv::Point2f> lines = kbm2(angle);
 }

@@ -55,11 +55,14 @@ int main()
     };
 
     StreamImage stream_image(3072, 2048);
+    // const auto driver_line = make_shared<DriverLine>("data/fisheye_calibration.yaml",
+    // "data/homography_calibration.yaml", 3072, 2048);
     const auto prediction_line = make_shared<PredictionLine>("data/fisheye_calibration.yaml",
                                                              "data/homography_calibration.yaml", 3072, 2048);
     const auto velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
     const auto demo_label = make_shared<TextComponent>(1536, 100, 2500, 200);
     const auto latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
+    // stream_image.add_component("driver_line", std::static_pointer_cast<Component>(driver_line));
     stream_image.add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
     stream_image.add_component("demo_label", std::static_pointer_cast<Component>(demo_label));
     stream_image.add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
@@ -79,6 +82,7 @@ int main()
             break;
         }
         // component update -----------------------------------
+        // driver_line->update(str_whe_phi.get_value(start + index));
         prediction_line->update(vel.get_value(start + index - static_cast<int>(latency * 100)) * 3.6f,
                                 ax.get_value(start + index - static_cast<int>(latency * 100)),
                                 str_whe_phi.get_value(start + index - static_cast<int>(latency * 100)),
@@ -95,11 +99,9 @@ int main()
         {
             stream_image >> *previous;
             imshow("frame", *previous);
+            waitKey(20);
         }
-        // imshow("frame2", *buffer.get_newest());
-        waitKey(20);
     }
     destroyWindow("frame");
-    destroyWindow("frame2");
     return 1;
 }
