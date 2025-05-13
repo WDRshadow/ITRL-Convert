@@ -11,12 +11,12 @@ add_subdirectory(tests)
 
 add_library(cuda_l
         STATIC
-        formatting.cu
+        src/formatting.cu
 )
 
 target_include_directories(cuda_l
         PUBLIC
-        .
+        include
 )
 
 set_target_properties(cuda_l PROPERTIES
@@ -34,7 +34,7 @@ file(GLOB COMMON_SOURCES ${TOP_DIR}/samples/common/classes/*.cpp)
 add_executable(cuda_encoder
         cuda_encoder.cu
         src/h265_encoder.cpp
-        src/cuda_stream.cu
+        src/formatting.cu
         src/bayer2nv12.cu
         ${COMMON_SOURCES}
 )
