@@ -7,7 +7,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 add_executable(motion_test
-        cyra_test.cpp
+        motion_test.cpp
 )
 
 target_include_directories(motion_test

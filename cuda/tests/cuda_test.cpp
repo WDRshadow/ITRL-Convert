@@ -1,10 +1,7 @@
 #include <iostream>
 #include <gtest/gtest.h>
 
-#include "bayer2rgb.h"
-#include "rgb2yuyv.h"
-#include "bayer2yuyv.h"
-#include "cuda_stream.h"
+#include "formatting.h"
 
 int main(int argc, char **argv)
 {
@@ -42,9 +39,8 @@ TEST(CUDA, BAYER_RGB)
         bayerHost[i] = static_cast<unsigned char>(rand() % 256);
     }
     
-    init_bayer2rgb_cuda(width, height, 8);
-    bayer2rgb_cuda(bayerHost, rgbHost);
-    cleanup_bayer2rgb_cuda();
+    CudaImageConverter converter(width, height, 1, BAYER2RGB);
+    converter.convert(bayerHost, rgbHost);
 
     std::cout << "[cuda] Conversion done. Output RGB size = " << width * height * 3 << " bytes." << std::endl;
 
@@ -65,9 +61,8 @@ TEST(CUDA, RGB_YUYV)
         rgbHost[i] = static_cast<unsigned char>(rand() % 256);
     }
     
-    init_rgb2yuyv_cuda(width, height, 8);
-    rgb2yuyv_cuda(rgbHost, yuyvHost);
-    cleanup_rgb2yuyv_cuda();
+    CudaImageConverter converter(width, height, 1, RGB2YUYV);
+    converter.convert(rgbHost, yuyvHost);
 
     std::cout << "[cuda] Conversion done. Output YUYV size = " << width * height * 2 << " bytes." << std::endl;
 
@@ -88,9 +83,8 @@ TEST(CUDA, BAYER_YUYV)
         bayerHost[i] = static_cast<unsigned char>(rand() % 256);
     }
     
-    init_bayer2yuyv_cuda(width, height, 8);
-    bayer2yuyv_cuda(bayerHost, yuyvHost);
-    cleanup_bayer2yuyv_cuda();
+    CudaImageConverter converter(width, height, 1, BAYER2YUYV);
+    converter.convert(bayerHost, yuyvHost);
 
     std::cout << "[cuda] Conversion done. Output YUYV size = " << width * height * 2 << " bytes." << std::endl;
 

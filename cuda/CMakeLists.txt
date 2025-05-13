@@ -11,16 +11,12 @@ add_subdirectory(tests)
 
 add_library(cuda_l
         STATIC
-        src/bayer2yuyv.cu
-        src/rgb2yuyv.cu
-        src/cuda_stream.cu
-        src/bayer2rgb.cu
-        src/bayer2nv12.cu
+        formatting.cu
 )
 
 target_include_directories(cuda_l
         PUBLIC
-        include
+        .
 )
 
 set_target_properties(cuda_l PROPERTIES

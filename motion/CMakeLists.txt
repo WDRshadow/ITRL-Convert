@@ -6,9 +6,19 @@ enable_testing()
 
 set(CMAKE_CXX_STANDARD 17)
 
+find_package(OpenCV REQUIRED)
+
+include_directories(
+        include
+        ${OpenCV_INCLUDE_DIRS}
+)
+
+link_libraries(${OpenCV_LIBS})
+
 add_library(motion
         STATIC
-        cyra.cpp
+        src/cyra.cpp
+        src/kbm.cpp
 )
 
 add_subdirectory(tests)

@@ -9,7 +9,7 @@ find_package(OpenCV REQUIRED)
 include_directories(
         include
         ${OpenCV_INCLUDE_DIRS}
-        ${CMAKE_SOURCE_DIR}/motion
+        ${CMAKE_SOURCE_DIR}/motion/include
 )
 
 link_libraries(${OpenCV_LIBS})

@@ -1,6 +1,7 @@
 #include "component.h"
 #include "util.h"
 #include "cyra.h"
+#include "kbm.h"
 
 StreamImage::StreamImage(const int width, const int height): components({}), width(width), height(height)
 {
@@ -76,13 +77,15 @@ DriverLine::DriverLine(const string& fisheye_config, const string& homography_co
 
 void DriverLine::update(const float str_whe_phi)
 {
-    const float angle = str_whe_phi / 4.1f;
-    const vector<Point2f> line_left = create_curve(Point2f(1511, 2047), Point2f(1511, 1663),
-                                                   Point2f(1511 + 125 * tan(angle), 1280), 300);
-    const vector<Point2f> line_right = create_curve(Point2f(1561, 2047), Point2f(1561, 1663),
-                                                    Point2f(1561 + 125 * tan(angle), 1280), 300);
-    vector<Point2f> lines = line_left;
-    lines.insert(lines.end(), line_right.begin(), line_right.end());
+    const float angle = str_whe_phi / STR_WHE_RATIO;
+    const vector<Point2f> trajectory = kbm2(angle);
+    Point2f origin = {ORIGIN_X, ORIGIN_Y};
+    vector<Point2f> lines;
+    lines.reserve(trajectory.size());
+    for (auto point : trajectory)
+    {
+        lines.emplace_back(origin.x + point.x * PIXELS_PER_METER, origin.y - point.y * PIXELS_PER_METER);
+    }
     project(lines);
 }
 
@@ -92,44 +95,33 @@ PredictionLine::PredictionLine(const string& fisheye_config, const string& homog
 {
 }
 
-void PredictionLine::update(const float v, const float a, float str_whe_phi_remote, const float str_whe_phi_local, const float latency)
+void PredictionLine::update(const float v, const float a, float str_whe_phi_remote, const float str_whe_phi_local,
+                            const float latency)
 {
-    const double omega = bycicleModel(v, str_whe_phi_remote / 20.0f, RCVE_WHBASE, RCVE_RATIO);
+    // CYRA Model----------------------------------------------------------------------------------
+    const double omega = bycicleModel(v, str_whe_phi_remote / STR_WHE_RATIO, RCVE_WHBASE, RCVE_RATIO);
     const auto [x, y, theta] = predictCYRA(v, a, omega, THETA0, latency);
-    vector<Point2f> lines = create_line({
-                                            static_cast<float>(1536 + y * 25),
-                                            static_cast<float>(2047 - x * 25)
-                                        },
-                                        theta, 25, 50);
-    // --------------------------------------------------------------------------------------------
+    Point2f origin = {
+        static_cast<float>(ORIGIN_X + y * PIXELS_PER_METER),
+        static_cast<float>(ORIGIN_Y - x * PIXELS_PER_METER)
+    };
+    vector<Point2f> lines = create_line(origin, theta, PIXELS_PER_METER, 50);
+    // KBM Model-----------------------------------------------------------------------------------
     const auto cos_theta = static_cast<float>(cos(theta));
     const auto sin_theta = static_cast<float>(sin(theta));
-    const float x_l = 1536 + static_cast<float>(y) * 25 - 25 * cos_theta;
-    const float y_l = 2047 - static_cast<float>(x) * 25 - 25 * sin_theta;
-    const float x_r = 1536 + static_cast<float>(y) * 25 + 25 * cos_theta;
-    const float y_r = 2047 - static_cast<float>(x) * 25 + 25 * sin_theta;
-    const float angle = str_whe_phi_local / 4.1f;
-    const vector<Point2f> line_left = create_curve(
-        {x_l, y_l},
-        {x_l + 384 * sin_theta, y_l - 384 * cos_theta},
-        {
-            x_l + 768 * sin_theta + 125 * tan(angle) * cos_theta,
-            y_l - 768 * cos_theta + 125 * tan(angle) * sin_theta
-        },
-        300
-    );
-    const vector<Point2f> line_right = create_curve(
-        {x_r, y_r},
-        {x_r + 384 * sin_theta, y_r - 384 * cos_theta},
-        {
-            x_r + 768 * sin_theta + 125 * tan(angle) * cos_theta,
-            y_r - 768 * cos_theta + 125 * tan(angle) * sin_theta
-        },
-        300
-    );
-    lines.insert(lines.end(), line_left.begin(), line_left.end());
-    lines.insert(lines.end(), line_right.begin(), line_right.end());
+    const float angle = str_whe_phi_local / STR_WHE_RATIO;
+    const vector<Point2f> trajectory = kbm2(angle);
+    vector<Point2f> lines_trajectory;
+    for (auto point : trajectory)
+    {
+        const float x_ = origin.x + point.x * PIXELS_PER_METER;
+        const float y_ = origin.y - point.y * PIXELS_PER_METER;
+        const float x_r = origin.x + (x_ - origin.x) * cos_theta - (y_ - origin.y) * sin_theta;
+        const float y_r = origin.y + (x_ - origin.x) * sin_theta + (y_ - origin.y) * cos_theta;
+        lines_trajectory.emplace_back(x_r, y_r);
+    }
     // --------------------------------------------------------------------------------------------
+    lines.insert(lines.end(), lines_trajectory.begin(), lines_trajectory.end());
     project(lines);
 }
 

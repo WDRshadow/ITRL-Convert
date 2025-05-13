@@ -17,8 +17,8 @@ add_subdirectory(motion)
 
 add_executable(rcve_stream main.cpp)
 
-target_include_directories(rcve_stream 
-        PUBLIC 
+target_include_directories(rcve_stream
+        PUBLIC
         ${OpenCV_INCLUDE_DIRS}
 )
 

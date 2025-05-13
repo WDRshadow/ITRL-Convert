@@ -35,6 +35,7 @@ State predictCYRA(double v0, double a0, double omega0, double theta0, double t);
 * @param omega_sw steering wheel angle (rad)
 * @param wheelbases distance between the front and rear axles (m)
 * @param ratio ratio between the steering wheel angle and the front wheel angle
+* @return yaw rate (rad/s)
 */
 double bycicleModel(double v, double omega_sw, double wheelbases, double ratio);
 
