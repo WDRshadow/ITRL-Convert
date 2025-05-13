@@ -17,7 +17,7 @@ target_include_directories(spinnaker_stream
         /usr/include/spinnaker
         ${OpenCV_INCLUDE_DIRS}
         ${CMAKE_SOURCE_DIR}/sensor/include
-        ${CMAKE_SOURCE_DIR}/cuda/include
+        ${CMAKE_SOURCE_DIR}/cuda
         ${CMAKE_SOURCE_DIR}/camera/include
 )
 

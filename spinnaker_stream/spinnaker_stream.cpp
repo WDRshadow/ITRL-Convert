@@ -8,9 +8,7 @@
 
 #include "spinnaker_stream.h"
 #include "component.h"
-#include "bayerRG2rgb.h"
-#include "rgb2yuyv.h"
-#include "cuda_stream.h"
+#include "formatting.h"
 #include "socket_bridge.h"
 #include "sensor.h"
 
@@ -28,9 +26,9 @@ char* buffer = nullptr;
 bool is_sensor_init = false;
 bool thread_signal = false;
 bool is_thread_running = false;
-unsigned char* imageData = nullptr;
-unsigned char* rgb24 = nullptr;
-unsigned char* yuyv422 = nullptr;
+unsigned char* bayer = nullptr;
+unsigned char* rgb = nullptr;
+unsigned char* yuyv = nullptr;
 std::thread sensor_thread;
 
 void capture_frames(const char* video_device, const std::string& ip, const int port, bool& signal)
@@ -89,6 +87,11 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
         std::cout << "[spinnaker stream] Sensor data not available." << std::endl;
     }
 
+    // Define the converter pointer
+    std::unique_ptr<CudaImageConverter> converter_bayer2rgb;
+    std::unique_ptr<CudaImageConverter> converter_rgb2yuyv;
+    std::unique_ptr<CudaImageConverter> converter_bayer2yuyv;
+
     unsigned int width;
     unsigned int height;
 
@@ -140,21 +143,21 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
             // Initialize CUDA and allocate memory for
             if (is_sensor_connected)
             {
-                init_bayerRG2rgb_cuda(width, height, CUDA_STREAMS);
-                init_rgb2yuyv_cuda(width, height, CUDA_STREAMS);
-                rgb24 = get_cuda_buffer(width * height * 3);
+                converter_bayer2rgb = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2RGB);
+                converter_rgb2yuyv = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, RGB2YUYV);
+                rgb = get_cuda_buffer(width * height * 3);
             }
             else
             {
-                init_bayer2yuyv_cuda(width, height, CUDA_STREAMS);
+                converter_bayer2yuyv = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2YUYV);
             }
-            yuyv422 = get_cuda_buffer(width * height * 2);
+            yuyv = get_cuda_buffer(width * height * 2);
             
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
             is_init = true;
         }
 
-        imageData = static_cast<unsigned char*>(pImage->GetData());
+        bayer = static_cast<unsigned char*>(pImage->GetData());
 
         // Add components to the image
         if (is_sensor_connected)
@@ -178,23 +181,20 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
                 latency_label->update("Latency: 0 ms");
                 is_sensor_init = true;
             }
-            // Handle BayerRG8 format: Convert BayerRG8 to RGB24
-            bayerRG2rgb_cuda(imageData, rgb24);
+            converter_bayer2rgb->convert(bayer, rgb);
             prediction_line->update(vel->get_value() * 3.6f, ax->get_value(), str_whe_phi->get_value(), str_whe_phi->get_value(), 0.0);
             velocity->update(to_string(static_cast<int>(vel->get_value() * 3.6f)));
-            *stream_image >> rgb24;
-            // Handle RGB24 format: Convert RGB24 to YUYV422
-            rgb2yuyv_cuda(rgb24, yuyv422);
+            *stream_image >> rgb;
+            converter_rgb2yuyv->convert(rgb, yuyv);
         }
         else
         {
-            // Handle BayerRG8 format: Convert BayerRG8 to YUYV422
-            bayer2yuyv_cuda(imageData, yuyv422);
+            converter_bayer2yuyv->convert(bayer, yuyv);
         }
 
 
         // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
-        if (write(video_fd, yuyv422, width * height * 2) == -1)
+        if (write(video_fd, yuyv, width * height * 2) == -1)
         {
             std::cerr << "[spinnaker stream] Error writing frame to virtual device" << std::endl;
             break;
@@ -233,13 +233,11 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     }
     if (is_init)
     {
-        imageData = nullptr;
-        free_cuda_buffer(rgb24);
-        rgb24 = nullptr;
-        free_cuda_buffer(yuyv422);
-        yuyv422 = nullptr;
-        cleanup_bayerRG2rgb_cuda();
-        cleanup_rgb2yuyv_cuda();
+        bayer = nullptr;
+        free_cuda_buffer(rgb);
+        rgb = nullptr;
+        free_cuda_buffer(yuyv);
+        yuyv = nullptr;
         is_init = false;
     }
     pImage = nullptr;
