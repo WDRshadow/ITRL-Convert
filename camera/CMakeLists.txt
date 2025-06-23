@@ -20,6 +20,7 @@ add_library(camera
         src/homography.cpp
         src/util.cpp
         src/component.cpp
+        src/gamma.cpp
 )
 
 set_target_properties(camera PROPERTIES

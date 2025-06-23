@@ -11,9 +11,11 @@
 #include "formatting.h"
 #include "socket_bridge.h"
 #include "sensor.h"
+#include "gamma.h"
 
 #define BUFFER_SIZE 8192
 #define CUDA_STREAMS 8
+#define Y_TARGET 128.0
 
 bool is_init = false;
 int video_fd;
@@ -21,17 +23,17 @@ Spinnaker::SystemPtr system_c = nullptr;
 Spinnaker::CameraPtr camera = nullptr;
 Spinnaker::CameraList camList;
 Spinnaker::ImagePtr pImage = nullptr;
-SocketBridge* bridge = nullptr;
-char* buffer = nullptr;
+SocketBridge *bridge = nullptr;
+char *buffer = nullptr;
 bool is_sensor_init = false;
 bool thread_signal = false;
 bool is_thread_running = false;
-unsigned char* bayer = nullptr;
-unsigned char* rgb = nullptr;
-unsigned char* yuyv = nullptr;
+unsigned char *bayer = nullptr;
+unsigned char *rgb = nullptr;
+unsigned char *yuyv = nullptr;
 std::thread sensor_thread;
 
-void capture_frames(const char* video_device, const std::string& ip, const int port, bool& signal)
+void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal)
 {
     // Open the virtual V4L2 device
     video_fd = open(video_device, O_WRONLY);
@@ -91,6 +93,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
     std::unique_ptr<CudaImageConverter> converter_bayer2rgb;
     std::unique_ptr<CudaImageConverter> converter_rgb2yuyv;
     std::unique_ptr<CudaImageConverter> converter_bayer2yuyv;
+    std::unique_ptr<PIDGammaController> gamma_controller;
 
     unsigned int width;
     unsigned int height;
@@ -111,8 +114,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
             // Get the image size
             width = pImage->GetWidth();
             height = pImage->GetHeight();
-            std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() <<
-            std::endl;
+            std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
 
             // Set the video device format
             struct v4l2_format vfmt = {};
@@ -128,7 +130,7 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
                 std::cerr << "[spinnaker stream] Failed to set video format on virtual device" << std::endl;
                 break;
             }
-        
+
             // Set the frame rate
             struct v4l2_streamparm streamparm = {};
             streamparm.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
@@ -152,12 +154,15 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
                 converter_bayer2yuyv = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2YUYV);
             }
             yuyv = get_cuda_buffer(width * height * 2);
-            
+
+            // Initialize Gamma controller
+            gamma_controller = std::make_unique<PIDGammaController>(0.1, 0.01, 0.01);
+
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
             is_init = true;
         }
 
-        bayer = static_cast<unsigned char*>(pImage->GetData());
+        bayer = static_cast<unsigned char *>(pImage->GetData());
 
         // Add components to the image
         if (is_sensor_connected)
@@ -192,6 +197,18 @@ void capture_frames(const char* video_device, const std::string& ip, const int p
             converter_bayer2yuyv->convert(bayer, yuyv);
         }
 
+        // Adjust the gamma value based on the mean Y value in the center ROI
+        double meanY = computeROImeanY(yuyv, height, width, height / 4, width / 4);
+        if (meanY >= 0.0)
+        {
+            const double gamma_current = camera->Gamma.GetValue();
+            double gamma = gamma_controller->update(meanY, Y_TARGET, gamma_current);
+            camera->Gamma.SetValue(gamma);
+        }
+        else
+        {
+            std::cerr << "[spinnaker stream] Error computing mean Y value" << std::endl;
+        }
 
         // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
         if (write(video_fd, yuyv, width * height * 2) == -1)
