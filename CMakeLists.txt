@@ -17,6 +17,6 @@ endif()
 add_subdirectory(zed_stream)
 add_subdirectory(cuda)
 
-add_executable(rcve_stream main.cpp)
+add_executable(svea_stream main.cpp)
 
-target_link_libraries(rcve_stream zed_stream cuda)
+target_link_libraries(svea_stream zed_stream cuda)

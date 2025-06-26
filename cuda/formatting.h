@@ -3,15 +3,6 @@
 
 #include <cstddef>
 
-#ifdef __CUDACC__
-__global__ void bayer2rgb_kernel(const unsigned char *bayer, unsigned char *rgb, unsigned int width, unsigned int height);
-__global__ void rgb2yuyv_kernel(const unsigned char *rgb, unsigned char *yuyv, unsigned int width, unsigned int height);
-#endif
-
-#define BAYER2YUYV 0
-#define BAYER2RGB 1
-#define RGB2YUYV 2
-
 /**
  * Use cudaHostAlloc to allocate a pinned memory buffer.
  *
@@ -34,20 +25,16 @@ protected:
     const unsigned int width;
     const unsigned int height;
     const int stream_num;
-    const int mode;
 
     const unsigned int block_height;
-    const size_t size_bayer_block;
-    const size_t size_rgb_block;
+    const size_t size_bgr_block;
     const size_t size_yuyv_block;
-    unsigned char *d_bayer = nullptr;
-    unsigned char *d_rgb = nullptr;
+    unsigned char *d_bgr = nullptr;
     unsigned char *d_yuyv = nullptr;
 
     cudaStream_t *streams = nullptr;
     dim3 *blockSize;
-    dim3 *gridSize_1;
-    dim3 *gridSize_2;
+    dim3 *gridSize;
 
 public:
     /**
@@ -56,9 +43,8 @@ public:
      * @param width Width of the image
      * @param height Height of the image
      * @param stream_num Number of CUDA streams
-     * @param mode Conversion mode (BAYER2YUYV, BAYER2RGB, RGB2YUYV)
      */
-    CudaImageConverter(unsigned int width, unsigned int height, int stream_num, int mode);
+    CudaImageConverter(unsigned int width, unsigned int height, int stream_num);
     ~CudaImageConverter();
     CudaImageConverter(const CudaImageConverter&) = delete;
     CudaImageConverter& operator=(const CudaImageConverter&) = delete;
