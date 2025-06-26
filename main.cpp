@@ -3,13 +3,13 @@
 #include <string>
 #include <csignal>
 
-#include "spinnaker_stream.h"
+#include "zed_stream.h"
 
 #define DEFAULT_VIDEO_DEVICE "/dev/video16"
 
 bool capture_signal = false;
 
-void run_spinnaker_stream(const char* videoDevice) {
+void run_streaming(const char* videoDevice) {
     std::cout << "[main] Starting to capture frames from the FLIR camera..." << std::endl;
     capture_frames(videoDevice, capture_signal);
     std::cout << "[main] Capture process finished" << std::endl;
@@ -60,5 +60,5 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
 
-    run_spinnaker_stream(videoDevice);
+    run_streaming(videoDevice);
 }
