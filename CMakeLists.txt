@@ -14,9 +14,20 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G -g -O0")
 endif()
 
+find_package(OpenCV REQUIRED)
+
 add_subdirectory(zed_stream)
+add_subdirectory(camera)
 add_subdirectory(cuda)
+add_subdirectory(sensor)
+add_subdirectory(motion)
 
 add_executable(svea_stream main.cpp)
 
-target_link_libraries(svea_stream zed_stream cuda)
+target_include_directories(svea_stream
+        PUBLIC
+        ${OpenCV_INCLUDE_DIRS}
+        ${CMAKE_SOURCE_DIR}/camera/include
+)
+
+target_link_libraries(svea_stream camera zed_stream cuda)
