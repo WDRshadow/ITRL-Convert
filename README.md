@@ -50,6 +50,7 @@ Once the video stream is running, you can use FleetMQ to stream the video to the
 You can also run the binary with the following parameters (default):
 - `-h` to display the help message
 - `-d <device>` to specify the video device (`/dev/video16`)
+- `-fps <fps>` to specify the frames per second (default is `60`)
 - `-s` to add the sensor data to the video stream (`false`)
 - `-ip <ip>` to bind the IP address of the sensor data (`0.0.0.0`)
 - `-p <port>` to bind the UDP port of the sensor data (`10086`)

@@ -5,6 +5,7 @@
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
 #include <thread>
+#include <chrono>
 
 #include "spinnaker_stream.h"
 #include "component.h"
@@ -33,7 +34,7 @@ unsigned char *rgb = nullptr;
 unsigned char *yuyv = nullptr;
 std::thread sensor_thread;
 
-void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal)
+void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps)
 {
     // Open the virtual V4L2 device
     video_fd = open(video_device, O_WRONLY);
@@ -97,6 +98,15 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
 
     unsigned int width;
     unsigned int height;
+    
+    // Calculate additional sleep time for frame rate control
+    // Default 60fps = 16.67ms per frame, target fps = 1000/fps ms per frame
+    // Additional sleep = (1000/fps - 1000/60) ms = (1000/fps - 16.67) ms
+    const int default_fps = 60;
+    int additional_sleep_ms = 0;
+    if (fps < default_fps) {
+        additional_sleep_ms = (1000 / fps) - (1000 / default_fps);
+    }
 
     while (!signal)
     {
@@ -135,7 +145,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             struct v4l2_streamparm streamparm = {};
             streamparm.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
             streamparm.parm.output.timeperframe.numerator = 1;
-            streamparm.parm.output.timeperframe.denominator = 60;
+            streamparm.parm.output.timeperframe.denominator = fps;
             if (ioctl(video_fd, VIDIOC_S_PARM, &streamparm) < 0)
             {
                 std::cerr << "[spinnaker stream] Failed to set frame rate" << std::endl;
@@ -215,6 +225,11 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         {
             std::cerr << "[spinnaker stream] Error writing frame to virtual device" << std::endl;
             break;
+        }
+
+        // Sleep additional time to achieve target fps (if lower than default 60fps)
+        if (additional_sleep_ms > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(additional_sleep_ms));
         }
 
         pImage->Release();
