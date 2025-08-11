@@ -27,9 +27,8 @@ protected:
     const int stream_num;
 
     const unsigned int block_height;
-    const size_t size_bgr_block;
+    const size_t size_bgra_block;
     const size_t size_yuyv_block;
-    unsigned char *d_bgr = nullptr;
     unsigned char *d_yuyv = nullptr;
 
     cudaStream_t *streams = nullptr;

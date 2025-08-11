@@ -19,22 +19,23 @@
 
 #define BLOCK_SIZE 32, 16
 
-__global__ void bgr2yuyv_kernel(const unsigned char *bgr, unsigned char *yuyv, unsigned int width, unsigned int height)
+__global__ void bgra2yuyv_kernel(const unsigned char *bgra, unsigned char *yuyv, unsigned int width, unsigned int height)
 {
     int x = (blockIdx.x * blockDim.x + threadIdx.x) * 2;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (x < width && y < height)
     {
-        int index_bgr = (y * width + x) * 3;
+        int index_bgra = (y * width + x) * 4;
         int index_yuyv = (y * width + x) * 2;
 
-        unsigned char r0 = bgr[index_bgr + 2];
-        unsigned char g0 = bgr[index_bgr + 1];
-        unsigned char b0 = bgr[index_bgr];
-        unsigned char r1 = bgr[index_bgr + 5];
-        unsigned char g1 = bgr[index_bgr + 4];
-        unsigned char b1 = bgr[index_bgr + 3];
+        unsigned char r0 = bgra[index_bgra + 2];
+        unsigned char g0 = bgra[index_bgra + 1];
+        unsigned char b0 = bgra[index_bgra];
+        // Skip alpha channel (index_bgra + 3)
+        unsigned char r1 = bgra[index_bgra + 6];
+        unsigned char g1 = bgra[index_bgra + 5];
+        unsigned char b1 = bgra[index_bgra + 4];
 
         unsigned char y0 = CLAMP(((Y_R * r0 + Y_G * g0 + Y_B * b0) >> 16) + 16);
         unsigned char y1 = CLAMP(((Y_R * r1 + Y_G * g1 + Y_B * b1) >> 16) + 16);
@@ -66,7 +67,7 @@ void free_cuda_buffer(unsigned char *h_pinned)
 CudaImageConverter::CudaImageConverter(unsigned int width, unsigned int height, int stream_num)
     : width(width), height(height), stream_num(stream_num),
       block_height(height / stream_num),
-      size_bgr_block(width * block_height * 3),
+      size_bgra_block(width * block_height * 4),  // BGRA has 4 bytes per pixel
       size_yuyv_block(width * block_height * 2)
 {
     blockSize = new dim3(BLOCK_SIZE);
@@ -78,7 +79,6 @@ CudaImageConverter::CudaImageConverter(unsigned int width, unsigned int height, 
     }
     gridSize = new dim3((width / 2 + blockSize->x - 1) / blockSize->x, (block_height + blockSize->y - 1) / blockSize->y);
     cudaMalloc((void **)&d_yuyv, width * height * 2);
-    cudaMalloc((void **)&d_bgr, width * height * 3);
 }
 
 CudaImageConverter::~CudaImageConverter()
@@ -91,21 +91,14 @@ CudaImageConverter::~CudaImageConverter()
     delete blockSize;
     delete gridSize;
     cudaFree(d_yuyv);
-    cudaFree(d_bgr);
 }
 
 void CudaImageConverter::convert(const unsigned char *src, unsigned char *dst)
 {
     for (int i = 0; i < stream_num; i++)
     {
-        cudaMemcpyAsync(
-            d_bgr + i * size_bgr_block,
-            src + i * size_bgr_block,
-            size_bgr_block,
-            cudaMemcpyHostToDevice,
-            streams[i]);
-        bgr2yuyv_kernel<<<*gridSize, *blockSize, 0, streams[i]>>>(
-            d_bgr + i * size_bgr_block,
+        bgra2yuyv_kernel<<<*gridSize, *blockSize, 0, streams[i]>>>(
+            src + i * size_bgra_block,
             d_yuyv + i * size_yuyv_block,
             width,
             block_height);
