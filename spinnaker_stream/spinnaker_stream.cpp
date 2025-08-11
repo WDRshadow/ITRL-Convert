@@ -7,7 +7,7 @@
 #include <thread>
 
 #include "spinnaker_stream.h"
-#include "cuda_stream.h"
+#include "formatting.h"
 
 #define BUFFER_SIZE 8192
 #define CUDA_STREAMS 8
@@ -42,6 +42,8 @@ void capture_frames(const char* video_device, bool& signal)
     camera = camList.GetByIndex(0);
     camera->Init();
     camera->BeginAcquisition();
+
+    std::unique_ptr<CudaImageConverter> converter_bayer2yuyv;
 
     unsigned int width;
     unsigned int height;
@@ -92,7 +94,7 @@ void capture_frames(const char* video_device, bool& signal)
             }
 
             // Initialize CUDA and allocate memory for YUYV422 format
-            init_bayer2yuyv_cuda(width, height, CUDA_STREAMS);
+            converter_bayer2yuyv = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2YUYV);
             yuyv422 = get_cuda_buffer(width * height * 2);
 
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
@@ -101,7 +103,7 @@ void capture_frames(const char* video_device, bool& signal)
 
         // Handle BayerRG8 format: Convert BayerRG8 to YUYV
         imageData = static_cast<unsigned char*>(pImage->GetData());
-        bayer2yuyv_cuda(imageData, yuyv422);
+        converter_bayer2yuyv->convert(imageData, yuyv422);
 
         // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
         if (write(video_fd, yuyv422, width * height * 2) == -1)
@@ -119,7 +121,6 @@ void capture_frames(const char* video_device, bool& signal)
         imageData = nullptr;
         free_cuda_buffer(yuyv422);
         yuyv422 = nullptr;
-        cleanup_bayer2yuyv_cuda();
         is_init = false;
     }
     pImage = nullptr;

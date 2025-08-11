@@ -6,7 +6,7 @@ cmake ..
 make -j
 ```
 
-You can find the binary file `rcve_stream` in the `build` directory.
+You can find the binary file `flir_stream` in the `build` directory.
 
 # Run the video stream
 
@@ -17,7 +17,7 @@ First prepare the video devices for receiving the processed video. To do this, r
 
 Then, you can start streaming video to the first video device by running the binary built in the previous step in `build` folder with
 ```bash
-./rcve_stream
+./flir_stream
 ```
 
 Now the stream is available on `/dev/video16`. If you want to view it, open a new terminal and run
