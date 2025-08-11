@@ -28,10 +28,11 @@ void capture_frames(const char *video_device, bool &signal)
 
     // Initialize zed
     sl::Camera zed;
-
     sl::InitParameters init_params;
     init_params.camera_resolution = sl::RESOLUTION::HD1080; // Use HD1080 video mode
+    init_params.depth_mode = sl::DEPTH_MODE::NONE;
     init_params.camera_fps = 30;                            // Set fps at 30
+    init_params.coordinate_units = sl::UNIT::MILLIMETER;
 
     sl::ERROR_CODE err = zed.open(init_params);
     if (err != sl::ERROR_CODE::SUCCESS)
