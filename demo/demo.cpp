@@ -62,11 +62,13 @@ int main()
     const auto velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
     const auto demo_label = make_shared<TextComponent>(1536, 100, 2500, 200);
     const auto latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
+    const auto reverse_camera = make_shared<ImageComponent_2>(1536, 456, 768, 512, 3072, 2048);
     // stream_image.add_component("driver_line", std::static_pointer_cast<Component>(driver_line));
     stream_image.add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
     stream_image.add_component("demo_label", std::static_pointer_cast<Component>(demo_label));
     stream_image.add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
     stream_image.add_component("velocity", std::static_pointer_cast<Component>(velocity));
+    stream_image.add_component("reverse_camera", std::static_pointer_cast<Component>(reverse_camera));
 
     constexpr float latency = 0.5;
     demo_label->update("Demo");
@@ -97,6 +99,7 @@ int main()
         }
         if (!previous->empty())
         {
+            reverse_camera->update(previous->data);
             stream_image >> *previous;
             imshow("frame", *previous);
             waitKey(20);

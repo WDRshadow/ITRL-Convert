@@ -135,3 +135,23 @@ void TextComponent::update(const string& text)
     reset_img();
     draw_text(text, width, height).copyTo(img);
 }
+
+ImageComponent_2::ImageComponent_2(const int x, const int y, const int width, const int height, const int origin_width,
+                                   const int origin_height)
+    : ImageComponent(x, y, width, height), origin_width(origin_width), origin_height(origin_height)
+{
+}
+
+void ImageComponent_2::update(const unsigned char *imageData)
+{
+    reset_img();
+    if (imageData)
+    {
+        Mat img_temp(origin_height, origin_width, CV_8UC3, const_cast<unsigned char *>(imageData));
+        resize(img_temp, img, Size(width, height), 0, 0, INTER_LINEAR);
+    }
+    else
+    {
+        std::cerr << "[ImageComponent_2] Error: imageData is null" << std::endl;
+    }
+}

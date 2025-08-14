@@ -24,9 +24,11 @@ const int _data_logger_ids[] = {RemoteSteeringAngle, Velocity, AX};
 bool is_init = false;
 int video_fd;
 Spinnaker::SystemPtr system_c = nullptr;
-Spinnaker::CameraPtr camera = nullptr;
 Spinnaker::CameraList camList;
+Spinnaker::CameraPtr camera = nullptr;
+Spinnaker::CameraPtr camera_2 = nullptr;
 Spinnaker::ImagePtr pImage = nullptr;
+Spinnaker::ImagePtr pImage_2 = nullptr;
 SocketBridge *bridge = nullptr;
 char *buffer = nullptr;
 bool is_sensor_init = false;
@@ -34,6 +36,8 @@ bool thread_signal = false;
 bool is_thread_running = false;
 unsigned char *bayer = nullptr;
 unsigned char *rgb = nullptr;
+unsigned char *bayer_2 = nullptr;
+unsigned char *rgb_2 = nullptr;
 unsigned char *yuyv = nullptr;
 std::thread sensor_thread;
 
@@ -58,12 +62,20 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     camera = camList.GetByIndex(0);
     camera->Init();
     camera->BeginAcquisition();
+    if (camList.getSize() > 1)
+    {
+        std::cerr << "[spinnaker stream] More than one camera detected, adding the reverse camera." << std::endl;
+        camera_2 = camList.GetByIndex(1);
+        camera_2->Init();
+        camera_2->BeginAcquisition();
+    }
 
     // Define the sensor data components
     std::unique_ptr<StreamImage> stream_image;
     std::shared_ptr<PredictionLine> prediction_line;
     std::shared_ptr<TextComponent> velocity;
     std::shared_ptr<TextComponent> latency_label;
+    std::shared_ptr<ImageComponent_2> reverse_camera;
     std::unique_ptr<SensorAPI> str_whe_phi;
     std::unique_ptr<SensorAPI> vel;
     std::unique_ptr<SensorAPI> ax;
@@ -97,7 +109,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     // Define the converter pointer
     std::unique_ptr<CudaImageConverter> converter_bayer2rgb;
     std::unique_ptr<CudaImageConverter> converter_rgb2yuyv;
-    std::unique_ptr<CudaImageConverter> converter_bayer2yuyv;
+    std::unique_ptr<CudaImageConverter> converter_bayer2rgb_2;
     std::unique_ptr<PIDGammaController> gamma_controller;
 
     unsigned int width;
@@ -116,6 +128,10 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     while (!signal)
     {
         pImage = camera->GetNextImage();
+        if (camera_2)
+        {
+            pImage_2 = camera_2->GetNextImage();
+        }
 
         if (pImage->IsIncomplete())
         {
@@ -158,26 +174,34 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             }
 
             // Initialize CUDA and allocate memory for
-            if (is_sensor_connected)
-            {
-                converter_bayer2rgb = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2RGB);
-                converter_rgb2yuyv = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, RGB2YUYV);
-                rgb = get_cuda_buffer(width * height * 3);
-            }
-            else
-            {
-                converter_bayer2yuyv = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2YUYV);
-            }
+            converter_bayer2rgb = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2RGB);
+            converter_rgb2yuyv = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, RGB2YUYV);
+            rgb = get_cuda_buffer(width * height * 3);
             yuyv = get_cuda_buffer(width * height * 2);
 
-            // Initialize Gamma controller
+            // Initialize other components
             gamma_controller = std::make_unique<PIDGammaController>(0.1, 0.01, 0.01);
+            stream_image = std::make_unique<StreamImage>(width, height);
+
+            if (camera_2)
+            {
+                converter_bayer2rgb_2 = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2RGB);
+                rgb_2 = get_cuda_buffer(width * height * 3);
+                reverse_camera = std::make_shared<ImageComponent_2>(1536, 456, 768, 512, 3072, 2048);
+                stream_image->add_component("reverse_camera", std::static_pointer_cast<Component>(reverse_camera));
+            }
 
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
             is_init = true;
         }
 
         bayer = static_cast<unsigned char *>(pImage->GetData());
+        converter_bayer2rgb->convert(bayer, rgb);
+        if (camera_2)
+        {
+            bayer_2 = static_cast<unsigned char *>(pImage_2->GetData());
+            converter_bayer2rgb_2->convert(bayer_2, rgb_2);
+        }
 
         // Add components to the image
         if (is_sensor_connected)
@@ -185,7 +209,6 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             if (!is_sensor_init)
             {
                 buffer = new char[BUFFER_SIZE];
-                stream_image = std::make_unique<StreamImage>(width, height);
                 prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
                                                                    "homography_calibration.yaml", width, height);
                 velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
@@ -205,20 +228,19 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 latency_label->update("Latency: 0 ms");
                 is_sensor_init = true;
             }
-            converter_bayer2rgb->convert(bayer, rgb);
             prediction_line->update(vel->get_value() * 3.6f, ax->get_value(), str_whe_phi->get_value(), str_whe_phi->get_value(), 0.0);
             velocity->update(to_string(static_cast<int>(vel->get_value() * 3.6f)));
-            *stream_image >> rgb;
-            converter_rgb2yuyv->convert(rgb, yuyv);
             if (logger)
             {
                 data_logger->logger();
             }
         }
-        else
+        if (camera_2)
         {
-            converter_bayer2yuyv->convert(bayer, yuyv);
+            reverse_camera->update(rgb_2);
         }
+        *stream_image >> rgb;
+        converter_rgb2yuyv->convert(rgb, yuyv);
 
         // Adjust the gamma value based on the mean Y value in the center ROI
         double meanY = computeROImeanY(yuyv, height, width, height / 4, width / 4);

@@ -88,4 +88,13 @@ public:
     void update(const string& text);
 };
 
+class ImageComponent_2 final : public ImageComponent
+{
+    const int origin_width;
+    const int origin_height;
+public:
+    ImageComponent_2(int x, int y, int width, int height, int origin_width, int origin_height);
+    void update(const unsigned char* imageData);
+};
+
 #endif //COMPONENT_H
