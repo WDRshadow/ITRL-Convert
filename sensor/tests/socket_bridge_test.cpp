@@ -77,7 +77,7 @@ TEST(SOCKET_BRIDGE, VELOCITY)
     std::thread t(receive_data_loop, &bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex), std::ref(flag), std::ref(isRunning));
     const SensorAPI sensor(Velocity, buffer, BUFFER_SIZE, bufferMutex);
     sleep(2);
-    EXPECT_EQ(sensor.get_value(), 10);
+    EXPECT_EQ(sensor.get_float_value(), 10);
     flag = true;
     if (t.joinable())
     {

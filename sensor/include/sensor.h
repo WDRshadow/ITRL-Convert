@@ -49,5 +49,6 @@ public:
 };
 
 float getFloatAt(const char* buffer, int id);
+int getIntAt(const char* buffer, int id);
 
 #endif //SENSOR_H

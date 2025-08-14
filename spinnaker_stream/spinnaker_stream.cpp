@@ -18,6 +18,8 @@
 #define BUFFER_SIZE 8192
 #define CUDA_STREAMS 8
 #define Y_TARGET 128.0
+#define FORWARD 0
+#define REVERSE 1
 
 const int _data_logger_ids[] = {RemoteSteeringAngle, Velocity, AX};
 
@@ -28,7 +30,7 @@ Spinnaker::CameraList camList;
 Spinnaker::CameraPtr camera = nullptr;
 Spinnaker::CameraPtr camera_2 = nullptr;
 Spinnaker::ImagePtr pImage = nullptr;
-Spinnaker::ImagePtr pImage_2 = nullptr;
+// Spinnaker::ImagePtr pImage_2 = nullptr;
 SocketBridge *bridge = nullptr;
 SocketBridge *bridge_2 = nullptr;
 char *buffer = nullptr;
@@ -38,8 +40,8 @@ bool thread_signal = false;
 bool is_thread_running = false;
 unsigned char *bayer = nullptr;
 unsigned char *rgb = nullptr;
-unsigned char *bayer_2 = nullptr;
-unsigned char *rgb_2 = nullptr;
+// unsigned char *bayer_2 = nullptr;
+// unsigned char *rgb_2 = nullptr;
 unsigned char *yuyv = nullptr;
 std::thread sensor_thread;
 std::thread sensor_thread_2;
@@ -78,10 +80,11 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     std::shared_ptr<PredictionLine> prediction_line;
     std::shared_ptr<TextComponent> velocity;
     std::shared_ptr<TextComponent> latency_label;
-    std::shared_ptr<ImageComponent_2> reverse_camera;
+    // std::shared_ptr<ImageComponent_2> reverse_camera;
     std::unique_ptr<SensorAPI> str_whe_phi;
     std::unique_ptr<SensorAPI> vel;
     std::unique_ptr<SensorAPI> ax;
+    std::unique_ptr<SensorAPI> direction;
     std::unique_ptr<DataLogger> data_logger;
     std::shared_mutex bufferMutex;
     std::shared_mutex bufferMutex_2;
@@ -140,15 +143,17 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     }
 
     // Vehicle direction
-    int vehicle_direction = 0; // 0: forward, 1: reverse
+    int vehicle_direction = FORWARD;
 
     while (!signal)
     {
-        pImage = camera->GetNextImage();
-        if (camera_2)
-        {
-            pImage_2 = camera_2->GetNextImage();
-        }
+        // pImage = camera->GetNextImage();
+        // if (camera_2)
+        // {
+        //     pImage_2 = camera_2->GetNextImage();
+        // }
+
+        pImage = vehicle_direction == FORWARD ? camera->GetNextImage() : camera_2->GetNextImage();
 
         if (pImage->IsIncomplete())
         {
@@ -200,13 +205,13 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             gamma_controller = std::make_unique<PIDGammaController>(0.1, 0.01, 0.01);
             stream_image = std::make_unique<StreamImage>(width, height);
 
-            if (camera_2)
-            {
-                converter_bayer2rgb_2 = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2RGB);
-                rgb_2 = get_cuda_buffer(width * height * 3);
-                reverse_camera = std::make_shared<ImageComponent_2>(1536, 456, 768, 512, 3072, 2048);
-                stream_image->add_component("reverse_camera", std::static_pointer_cast<Component>(reverse_camera));
-            }
+            // if (camera_2)
+            // {
+            // converter_bayer2rgb_2 = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2RGB);
+            // rgb_2 = get_cuda_buffer(width * height * 3);
+            // reverse_camera = std::make_shared<ImageComponent_2>(1536, 456, 768, 512, 3072, 2048);
+            // stream_image->add_component("reverse_camera", std::static_pointer_cast<Component>(reverse_camera));
+            // }
 
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
             is_init = true;
@@ -214,11 +219,11 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
 
         bayer = static_cast<unsigned char *>(pImage->GetData());
         converter_bayer2rgb->convert(bayer, rgb);
-        if (camera_2)
-        {
-            bayer_2 = static_cast<unsigned char *>(pImage_2->GetData());
-            converter_bayer2rgb_2->convert(bayer_2, rgb_2);
-        }
+        // if (camera_2)
+        // {
+        //     bayer_2 = static_cast<unsigned char *>(pImage_2->GetData());
+        //     converter_bayer2rgb_2->convert(bayer_2, rgb_2);
+        // }
 
         // Add components to the image
         if (is_sensor_connected)
@@ -234,6 +239,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, BUFFER_SIZE, bufferMutex);
                 vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
                 ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
+                direction = std::make_unique<SensorAPI>(Direction, buffer_2, BUFFER_SIZE, bufferMutex_2);
                 if (logger)
                 {
                     data_logger = std::make_unique<DataLogger>(_data_logger_ids, 3, buffer, BUFFER_SIZE, bufferMutex, logger);
@@ -241,25 +247,30 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex),
                                             std::ref(thread_signal), std::ref(is_thread_running));
                 sensor_thread_2 = std::thread(receive_data_loop, bridge_2, buffer_2, BUFFER_SIZE, std::ref(bufferMutex_2),
-                            std::ref(thread_signal), std::ref(is_thread_running));
+                                              std::ref(thread_signal), std::ref(is_thread_running));
                 stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
                 stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
                 stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
                 latency_label->update("Latency: 0 ms");
                 is_sensor_init = true;
             }
-            prediction_line->update(vel->get_float_value() * 3.6f, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), 0.0);
-            velocity->update(to_string(static_cast<int>(vel->get_float_value() * 3.6f)));
+            if (vehicle_direction == FORWARD)
+            {
+                prediction_line->update(vel->get_float_value() * 3.6f, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), 0.0);
+                velocity->update(to_string(static_cast<int>(vel->get_float_value() * 3.6f)));
+                *stream_image >> rgb;
+            }
             if (logger)
             {
                 data_logger->logger();
             }
+            vehicle_direction = direction->get_int_value();
         }
-        if (camera_2)
-        {
-            reverse_camera->update(rgb_2);
-        }
-        *stream_image >> rgb;
+        // if (camera_2)
+        // {
+        //     reverse_camera->update(rgb_2);
+        // }
+        // *stream_image >> rgb;
         converter_rgb2yuyv->convert(rgb, yuyv);
 
         // Adjust the gamma value based on the mean Y value in the center ROI
@@ -289,10 +300,10 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         }
 
         pImage->Release();
-        if (camera_2)
-        {
-            pImage_2->Release();
-        }
+        // if (camera_2)
+        // {
+        //     pImage_2->Release();
+        // }
     }
 
     // Cleanup
@@ -336,15 +347,15 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         rgb = nullptr;
         free_cuda_buffer(yuyv);
         yuyv = nullptr;
-        if (camera_2)
-        {
-            free_cuda_buffer(rgb_2);
-            rgb_2 = nullptr;
-        }
+        // if (camera_2)
+        // {
+        //     free_cuda_buffer(rgb_2);
+        //     rgb_2 = nullptr;
+        // }
         is_init = false;
     }
     pImage = nullptr;
-    pImage_2 = nullptr;
+    // pImage_2 = nullptr;
     camera->EndAcquisition();
     camera->DeInit();
     camera = nullptr;

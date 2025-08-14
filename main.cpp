@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
         {
             port = DEFAULT_PORT;
         }
-        std::cout << "[main] Using IP: " << ip << " and port: " << port << std::endl;
+        std::cout << "[main] Using IP: " << ip << " and port: " << port << "/" << port + 1 << std::endl;
     }
     else
     {
