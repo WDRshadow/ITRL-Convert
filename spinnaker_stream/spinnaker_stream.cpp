@@ -30,7 +30,9 @@ Spinnaker::CameraPtr camera_2 = nullptr;
 Spinnaker::ImagePtr pImage = nullptr;
 Spinnaker::ImagePtr pImage_2 = nullptr;
 SocketBridge *bridge = nullptr;
+SocketBridge *bridge_2 = nullptr;
 char *buffer = nullptr;
+char *buffer_2 = nullptr;
 bool is_sensor_init = false;
 bool thread_signal = false;
 bool is_thread_running = false;
@@ -40,6 +42,7 @@ unsigned char *bayer_2 = nullptr;
 unsigned char *rgb_2 = nullptr;
 unsigned char *yuyv = nullptr;
 std::thread sensor_thread;
+std::thread sensor_thread_2;
 
 void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps, const char *logger)
 {
@@ -81,6 +84,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     std::unique_ptr<SensorAPI> ax;
     std::unique_ptr<DataLogger> data_logger;
     std::shared_mutex bufferMutex;
+    std::shared_mutex bufferMutex_2;
 
     // Initialize Streaming Component
     bool is_sensor_connected = false;
@@ -90,6 +94,11 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         if (bridge)
         {
             is_sensor_connected = bridge->isValid();
+        }
+        bridge_2 = new SocketBridge(ip, port + 1);
+        if (bridge_2)
+        {
+            is_sensor_connected = is_sensor_connected || bridge_2->isValid();
         }
     }
     if (is_sensor_connected)
@@ -102,6 +111,11 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         {
             delete bridge;
             bridge = nullptr;
+        }
+        if (bridge_2)
+        {
+            delete bridge_2;
+            bridge_2 = nullptr;
         }
         std::cout << "[spinnaker stream] Sensor data not available." << std::endl;
     }
@@ -124,6 +138,9 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     {
         additional_sleep_ms = (1000 / fps) - (1000 / default_fps);
     }
+
+    // Vehicle direction
+    int vehicle_direction = 0; // 0: forward, 1: reverse
 
     while (!signal)
     {
@@ -209,6 +226,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             if (!is_sensor_init)
             {
                 buffer = new char[BUFFER_SIZE];
+                buffer_2 = new char[BUFFER_SIZE];
                 prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
                                                                    "homography_calibration.yaml", width, height);
                 velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
@@ -222,14 +240,16 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 }
                 sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex),
                                             std::ref(thread_signal), std::ref(is_thread_running));
+                sensor_thread_2 = std::thread(receive_data_loop, bridge_2, buffer_2, BUFFER_SIZE, std::ref(bufferMutex_2),
+                            std::ref(thread_signal), std::ref(is_thread_running));
                 stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
                 stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
                 stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
                 latency_label->update("Latency: 0 ms");
                 is_sensor_init = true;
             }
-            prediction_line->update(vel->get_value() * 3.6f, ax->get_value(), str_whe_phi->get_value(), str_whe_phi->get_value(), 0.0);
-            velocity->update(to_string(static_cast<int>(vel->get_value() * 3.6f)));
+            prediction_line->update(vel->get_float_value() * 3.6f, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), 0.0);
+            velocity->update(to_string(static_cast<int>(vel->get_float_value() * 3.6f)));
             if (logger)
             {
                 data_logger->logger();
@@ -290,17 +310,23 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             {
                 std::cerr << "[spinnaker stream] Sensor thread did not exit gracefully" << std::endl;
                 sensor_thread.detach();
+                sensor_thread_2.detach();
             }
             else
             {
                 sensor_thread.join();
+                sensor_thread_2.join();
             }
         }
         thread_signal = false;
         delete[] buffer;
         buffer = nullptr;
+        delete[] buffer_2;
+        buffer_2 = nullptr;
         delete bridge;
         bridge = nullptr;
+        delete bridge_2;
+        bridge_2 = nullptr;
         is_sensor_init = false;
     }
     if (is_init)

@@ -27,6 +27,13 @@
 #define XXXXX_4 23
 #define XXXXX_5 24
 
+#define PkgNr 0
+#define RefStrAngle 1
+#define RefThrottle 2
+#define RefBrk 3
+#define Direction 4
+#define model_1 5
+
 class SensorAPI
 {
     const int id;
@@ -37,7 +44,8 @@ class SensorAPI
 
 public:
     explicit SensorAPI(int id, char* buffer, int buffer_size, std::shared_mutex& bufferMutex);
-    [[nodiscard]] float get_value() const;
+    [[nodiscard]] float get_float_value() const;
+    [[nodiscard]] int get_int_value() const;
 };
 
 float getFloatAt(const char* buffer, int id);
