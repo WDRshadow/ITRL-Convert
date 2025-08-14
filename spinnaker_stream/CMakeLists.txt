@@ -9,7 +9,7 @@ add_library(spinnaker_stream
 
 target_include_directories(spinnaker_stream
         PUBLIC
-        /opt/spinnaker/include
+        /usr/include/spinnaker
         .
         ${CMAKE_SOURCE_DIR}/cuda
 )
