@@ -62,7 +62,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     camera = camList.GetByIndex(0);
     camera->Init();
     camera->BeginAcquisition();
-    if (camList.getSize() > 1)
+    if (camList.GetSize() > 1)
     {
         std::cerr << "[spinnaker stream] More than one camera detected, adding the reverse camera." << std::endl;
         camera_2 = camList.GetByIndex(1);
