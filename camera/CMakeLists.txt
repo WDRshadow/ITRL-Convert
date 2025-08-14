@@ -16,6 +16,7 @@ link_libraries(${OpenCV_LIBS})
 
 add_library(camera
         STATIC
+        src/ring_buffer.cpp
         src/fisheye.cpp
         src/homography.cpp
         src/util.cpp

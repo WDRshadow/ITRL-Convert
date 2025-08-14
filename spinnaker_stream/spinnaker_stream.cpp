@@ -14,6 +14,7 @@
 #include "sensor.h"
 #include "data_logger.h"
 #include "gamma.h"
+#include "ring_buffer.h"
 
 #define BUFFER_SIZE 8192
 #define CUDA_STREAMS 8
@@ -46,7 +47,7 @@ unsigned char *yuyv = nullptr;
 std::thread sensor_thread;
 std::thread sensor_thread_2;
 
-void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps, const char *logger)
+void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps, const int delay_ms, const char *logger)
 {
     // Open the virtual V4L2 device
     video_fd = open(video_device, O_WRONLY);
@@ -67,6 +68,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     camera = camList.GetByIndex(0);
     camera->Init();
     camera->BeginAcquisition();
+    camera->GammaEnable.SetValue(true);
     if (camList.GetSize() > 1)
     {
         std::cerr << "[spinnaker stream] More than one camera detected, adding the reverse camera." << std::endl;
@@ -88,6 +90,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     std::unique_ptr<DataLogger> data_logger;
     std::shared_mutex bufferMutex;
     std::shared_mutex bufferMutex_2;
+    std::unique_ptr<RingBuffer> image_buffer = nullptr;
 
     // Initialize Streaming Component
     bool is_sensor_connected = false;
@@ -205,6 +208,13 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             gamma_controller = std::make_unique<PIDGammaController>(0.1, 0.01, 0.01);
             stream_image = std::make_unique<StreamImage>(width, height);
 
+            // Initialize ring buffer for variable delay, BayerRG format (1 bytes per pixel)
+            if (delay_ms >= 0)
+            {
+                image_buffer = std::make_unique<RingBuffer>(delay_ms, fps, width, height, 1);
+                std::cout << "[spinnaker stream] Ring buffer initialized for " << delay_ms << "ms delay" << std::endl;
+            }
+
             // if (camera_2)
             // {
             // converter_bayer2rgb_2 = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2RGB);
@@ -218,7 +228,18 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         }
 
         bayer = static_cast<unsigned char *>(pImage->GetData());
-        converter_bayer2rgb->convert(bayer, rgb);
+
+        if (delay_ms > 0)
+        {
+            image_buffer->update(bayer);
+            unsigned char *delayed_bayer = image_buffer->get_oldest();
+            converter_bayer2rgb->convert(delayed_bayer, rgb);
+        }
+        else
+        {
+            converter_bayer2rgb->convert(bayer, rgb);
+        }
+
         // if (camera_2)
         // {
         //     bayer_2 = static_cast<unsigned char *>(pImage_2->GetData());
@@ -251,7 +272,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
                 stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
                 stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
-                latency_label->update("Latency: 0 ms");
+                latency_label->update(std::to_string(delay_ms) + " ms");
                 is_sensor_init = true;
             }
             if (vehicle_direction == FORWARD)
@@ -286,7 +307,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             std::cerr << "[spinnaker stream] Error computing mean Y value" << std::endl;
         }
 
-        // Write the YUYV422 (16 bits per pixel) data to the virtual video device as YUYV422
+        // Write the YUYV422 (16 bits per pixel) data to the virtual video device
         if (write(video_fd, yuyv, width * height * 2) == -1)
         {
             std::cerr << "[spinnaker stream] Error writing frame to virtual device" << std::endl;
@@ -297,6 +318,11 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         if (additional_sleep_ms > 0)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(additional_sleep_ms));
+        }
+
+        if (delay_ms >= 0)
+        {
+            image_buffer->join();
         }
 
         pImage->Release();
@@ -347,6 +373,10 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         rgb = nullptr;
         free_cuda_buffer(yuyv);
         yuyv = nullptr;
+        if (delay_ms >= 0)
+        {
+            image_buffer.reset();
+        }
         // if (camera_2)
         // {
         //     free_cuda_buffer(rgb_2);
