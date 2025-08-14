@@ -209,7 +209,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             stream_image = std::make_unique<StreamImage>(width, height);
 
             // Initialize ring buffer for variable delay, BayerRG format (1 bytes per pixel)
-            if (delay_ms >= 0)
+            if (delay_ms > 0)
             {
                 image_buffer = std::make_unique<RingBuffer>(delay_ms, fps, width, height, 1);
                 std::cout << "[spinnaker stream] Ring buffer initialized for " << delay_ms << "ms delay" << std::endl;
@@ -296,7 +296,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
 
         // Adjust the gamma value based on the mean Y value in the center ROI
         double meanY = computeROImeanY(yuyv, height, width, height / 4, width / 4);
-        if (meanY >= 0.0)
+        if (meanY > 0.0)
         {
             const double gamma_current = camera->Gamma.GetValue();
             double gamma = gamma_controller->update(meanY, Y_TARGET, gamma_current);
@@ -320,7 +320,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             std::this_thread::sleep_for(std::chrono::milliseconds(additional_sleep_ms));
         }
 
-        if (delay_ms >= 0)
+        if (delay_ms > 0)
         {
             image_buffer->join();
         }
@@ -373,7 +373,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         rgb = nullptr;
         free_cuda_buffer(yuyv);
         yuyv = nullptr;
-        if (delay_ms >= 0)
+        if (delay_ms > 0)
         {
             image_buffer.reset();
         }
