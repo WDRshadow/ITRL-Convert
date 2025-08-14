@@ -15,7 +15,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 find_package(OpenCV REQUIRED)
-link_libraries(Spinnaker)
 
 add_subdirectory(spinnaker_stream)
 add_subdirectory(camera)
@@ -25,6 +24,11 @@ add_subdirectory(demo)
 add_subdirectory(motion)
 
 add_executable(rcve_stream main.cpp)
+
+target_link_directories(rcve_stream
+        PUBLIC
+        /opt/spinnaker/lib
+)   
 
 target_include_directories(rcve_stream
         PUBLIC
