@@ -269,6 +269,10 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         }
 
         pImage->Release();
+        if (camera_2)
+        {
+            pImage_2->Release();
+        }
     }
 
     // Cleanup
@@ -306,12 +310,24 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         rgb = nullptr;
         free_cuda_buffer(yuyv);
         yuyv = nullptr;
+        if (camera_2)
+        {
+            free_cuda_buffer(rgb_2);
+            rgb_2 = nullptr;
+        }
         is_init = false;
     }
     pImage = nullptr;
+    pImage_2 = nullptr;
     camera->EndAcquisition();
     camera->DeInit();
     camera = nullptr;
+    if (camera_2)
+    {
+        camera_2->EndAcquisition();
+        camera_2->DeInit();
+        camera_2 = nullptr;
+    }
     camList.Clear();
     system_c->ReleaseInstance();
     system_c = nullptr;
