@@ -12,11 +12,14 @@
 #include "formatting.h"
 #include "socket_bridge.h"
 #include "sensor.h"
+#include "data_logger.h"
 #include "gamma.h"
 
 #define BUFFER_SIZE 8192
 #define CUDA_STREAMS 8
 #define Y_TARGET 128.0
+
+const int _data_logger_ids[] = {RemoteSteeringAngle, Velocity, AX};
 
 bool is_init = false;
 int video_fd;
@@ -34,7 +37,7 @@ unsigned char *rgb = nullptr;
 unsigned char *yuyv = nullptr;
 std::thread sensor_thread;
 
-void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps)
+void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps, const char *logger)
 {
     // Open the virtual V4L2 device
     video_fd = open(video_device, O_WRONLY);
@@ -64,6 +67,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     std::unique_ptr<SensorAPI> str_whe_phi;
     std::unique_ptr<SensorAPI> vel;
     std::unique_ptr<SensorAPI> ax;
+    std::unique_ptr<DataLogger> data_logger;
     std::shared_mutex bufferMutex;
 
     // Initialize Streaming Component
@@ -98,13 +102,14 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
 
     unsigned int width;
     unsigned int height;
-    
+
     // Calculate additional sleep time for frame rate control
     // Default 60fps = 16.67ms per frame, target fps = 1000/fps ms per frame
     // Additional sleep = (1000/fps - 1000/60) ms = (1000/fps - 16.67) ms
     const int default_fps = 60;
     int additional_sleep_ms = 0;
-    if (fps < default_fps) {
+    if (fps < default_fps)
+    {
         additional_sleep_ms = (1000 / fps) - (1000 / default_fps);
     }
 
@@ -188,6 +193,10 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, BUFFER_SIZE, bufferMutex);
                 vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
                 ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
+                if (logger)
+                {
+                    data_logger = std::make_unique<DataLogger>(_data_logger_ids, 3, buffer, BUFFER_SIZE, bufferMutex, logger);
+                }
                 sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex),
                                             std::ref(thread_signal), std::ref(is_thread_running));
                 stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
@@ -201,6 +210,10 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             velocity->update(to_string(static_cast<int>(vel->get_value() * 3.6f)));
             *stream_image >> rgb;
             converter_rgb2yuyv->convert(rgb, yuyv);
+            if (logger)
+            {
+                data_logger->logger();
+            }
         }
         else
         {
@@ -228,7 +241,8 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         }
 
         // Sleep additional time to achieve target fps (if lower than default 60fps)
-        if (additional_sleep_ms > 0) {
+        if (additional_sleep_ms > 0)
+        {
             std::this_thread::sleep_for(std::chrono::milliseconds(additional_sleep_ms));
         }
 

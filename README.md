@@ -54,6 +54,7 @@ You can also run the binary with the following parameters (default):
 - `-s` to add the sensor data to the video stream (`false`)
 - `-ip <ip>` to bind the IP address of the sensor data (`0.0.0.0`)
 - `-p <port>` to bind the UDP port of the sensor data (`10086`)
+- `-log <logger>` to specify the logger file (default is `""`)
 - `-fc` to calibrate the fisheye camera
 - `-fu <image>` to undistort the image
 - `-hc` to calibrate the homography matrix
