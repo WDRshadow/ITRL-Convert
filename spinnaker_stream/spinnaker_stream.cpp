@@ -296,17 +296,20 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         converter_rgb2yuyv->convert(rgb, yuyv);
 
         // Adjust the gamma value based on the mean Y value in the center ROI
-        double meanY = computeROImeanY(yuyv, height, width, height / 4, width / 4);
-        if (meanY > 0.0)
+        if (vehicle_direction == FORWARD && gamma_controller)
         {
-            const double gamma_current = camera->Gamma.GetValue();
-            double gamma = gamma_controller->update(meanY, Y_TARGET, gamma_current);
-            camera->Gamma.SetValue(gamma);
-            // std::cout << "[spinnaker stream] Mean Y value: " << meanY << ", Gamma set to: " << gamma << std::endl;
-        }
-        else
-        {
-            std::cerr << "[spinnaker stream] Error computing mean Y value" << std::endl;
+            double meanY = computeROImeanY(yuyv, height, width, height / 4, width / 4);
+            if (meanY > 0.0)
+            {
+                const double gamma_current = camera->Gamma.GetValue();
+                double gamma = gamma_controller->update(meanY, Y_TARGET, gamma_current);
+                camera->Gamma.SetValue(gamma);
+                // std::cout << "[spinnaker stream] Mean Y value: " << meanY << ", Gamma set to: " << gamma << std::endl;
+            }
+            else
+            {
+                std::cerr << "[spinnaker stream] Error computing mean Y value" << std::endl;
+            }
         }
 
         // Write the YUYV422 (16 bits per pixel) data to the virtual video device
