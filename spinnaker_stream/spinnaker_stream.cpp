@@ -20,7 +20,6 @@
 #define CUDA_STREAMS 8
 #define Y_TARGET 115.0
 #define FORWARD 0
-#define REVERSE 1
 
 const int _data_logger_ids[] = {RemoteSteeringAngle, Velocity, AX};
 
@@ -39,6 +38,7 @@ char *buffer_2 = nullptr;
 bool is_sensor_init = false;
 bool thread_signal = false;
 bool is_thread_running = false;
+bool is_thread_running_2 = false;
 unsigned char *bayer = nullptr;
 unsigned char *rgb = nullptr;
 // unsigned char *bayer_2 = nullptr;
@@ -104,7 +104,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         bridge_2 = new SocketBridge(ip, port + 1);
         if (bridge_2)
         {
-            is_sensor_connected = is_sensor_connected || bridge_2->isValid();
+            is_sensor_connected = is_sensor_connected && bridge_2->isValid();
         }
     }
     if (is_sensor_connected)
@@ -268,7 +268,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex),
                                             std::ref(thread_signal), std::ref(is_thread_running));
                 sensor_thread_2 = std::thread(receive_data_loop, bridge_2, buffer_2, BUFFER_SIZE, std::ref(bufferMutex_2),
-                                              std::ref(thread_signal), std::ref(is_thread_running));
+                                              std::ref(thread_signal), std::ref(is_thread_running_2));
                 stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
                 stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
                 stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
@@ -286,6 +286,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 data_logger->logger();
             }
             vehicle_direction = direction->get_int_value();
+            vehicle_direction = (vehicle_direction == 1) ? FORWARD : vehicle_direction;
         }
         // if (camera_2)
         // {
@@ -337,14 +338,14 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     if (is_sensor_init)
     {
         thread_signal = true;
-        if (sensor_thread.joinable())
+        if (sensor_thread.joinable() && sensor_thread_2.joinable())
         {
             int count = 0;
-            while (is_thread_running && count++ < 30)
+            while ((is_thread_running || is_thread_running_2) && count++ < 30)
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
-            if (is_thread_running)
+            if (is_thread_running || is_thread_running_2)
             {
                 std::cerr << "[spinnaker stream] Sensor thread did not exit gracefully" << std::endl;
                 sensor_thread.detach();
