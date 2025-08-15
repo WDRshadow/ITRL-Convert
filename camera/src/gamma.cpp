@@ -10,18 +10,20 @@ PIDGammaController::PIDGammaController(
     double Kd,
     double gamma_min,
     double gamma_max,
+    double max_delta,
     double dt)
     : Kp_(Kp), Ki_(Ki), Kd_(Kd),
       gamma_min_(gamma_min), gamma_max_(gamma_max),
-      dt_(dt), integral_(0.0), prev_error_(0.0) {}
+      max_delta_(max_delta), dt_(dt), integral_(0.0), prev_error_(0.0) {}
 
 double PIDGammaController::update(double Y_current, double Y_target, double gamma_current)
 {
-    double error = Y_target - Y_current;
+    double error = Y_current - Y_target;
     integral_ += error * dt_;
     double derivative = (error - prev_error_) / dt_;
 
     double delta = Kp_ * error + Ki_ * integral_ + Kd_ * derivative;
+    delta = delta > max_delta_ ? max_delta_ : delta;
     double gamma_next = gamma_current + delta;
 
     gamma_next = std::clamp(gamma_next, gamma_min_, gamma_max_);

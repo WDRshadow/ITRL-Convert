@@ -18,7 +18,7 @@
 
 #define BUFFER_SIZE 8192
 #define CUDA_STREAMS 8
-#define Y_TARGET 128.0
+#define Y_TARGET 115.0
 #define FORWARD 0
 #define REVERSE 1
 
@@ -205,7 +205,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             yuyv = get_cuda_buffer(width * height * 2);
 
             // Initialize other components
-            gamma_controller = std::make_unique<PIDGammaController>(0.1, 0.01, 0.01);
+            gamma_controller = std::make_unique<PIDGammaController>(0.0003, 0.0001, 0.000001, 0.25, 4.0, 0.01);
             stream_image = std::make_unique<StreamImage>(width, height);
 
             // Initialize ring buffer for variable delay, BayerRG format (1 bytes per pixel)
@@ -301,6 +301,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             const double gamma_current = camera->Gamma.GetValue();
             double gamma = gamma_controller->update(meanY, Y_TARGET, gamma_current);
             camera->Gamma.SetValue(gamma);
+            // std::cout << "[spinnaker stream] Mean Y value: " << meanY << ", Gamma set to: " << gamma << std::endl;
         }
         else
         {
