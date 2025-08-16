@@ -32,7 +32,8 @@
 #define RefThrottle 2
 #define RefBrk 3
 #define Direction 4
-#define model_1 5
+#define Model_1 5
+#define Latency 6
 
 class SensorAPI
 {

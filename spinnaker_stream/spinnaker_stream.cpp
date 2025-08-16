@@ -16,12 +16,17 @@
 #include "gamma.h"
 #include "ring_buffer.h"
 
-#define BUFFER_SIZE 8192
+#define BUFFER_SIZE 2048
 #define CUDA_STREAMS 8
 #define Y_TARGET 115.0
 #define FORWARD 0
 
-const int _data_logger_ids[] = {RemoteSteeringAngle, Velocity, AX};
+#define DATA_NUM 3
+const int _data_logger_ids[] = {IncPkgNr, Velocity, AX};
+const int _data_logger_type[] = {_TYPE_INT, _TYPE_FLOAT, _TYPE_FLOAT};
+#define DATA_NUM_2 4
+const int _data_logger_ids_2[] = {PkgNr, RefStrAngle, RefThrottle, RefBrk, Direction};
+const int _data_logger_type_2[] = {_TYPE_INT, _TYPE_FLOAT, _TYPE_FLOAT, _TYPE_FLOAT, _TYPE_INT};
 
 bool is_init = false;
 int video_fd;
@@ -30,7 +35,6 @@ Spinnaker::CameraList camList;
 Spinnaker::CameraPtr camera = nullptr;
 Spinnaker::CameraPtr camera_2 = nullptr;
 Spinnaker::ImagePtr pImage = nullptr;
-// Spinnaker::ImagePtr pImage_2 = nullptr;
 SocketBridge *bridge = nullptr;
 SocketBridge *bridge_2 = nullptr;
 char *buffer = nullptr;
@@ -41,13 +45,11 @@ bool is_thread_running = false;
 bool is_thread_running_2 = false;
 unsigned char *bayer = nullptr;
 unsigned char *rgb = nullptr;
-// unsigned char *bayer_2 = nullptr;
-// unsigned char *rgb_2 = nullptr;
 unsigned char *yuyv = nullptr;
 std::thread sensor_thread;
 std::thread sensor_thread_2;
 
-void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps, const int delay_ms, const char *logger)
+void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps, const int delay_ms, const char *logger, const bool is_hmi)
 {
     // Open the virtual V4L2 device
     video_fd = open(video_device, O_WRONLY);
@@ -82,12 +84,13 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     std::shared_ptr<PredictionLine> prediction_line;
     std::shared_ptr<TextComponent> velocity;
     std::shared_ptr<TextComponent> latency_label;
-    // std::shared_ptr<ImageComponent_2> reverse_camera;
-    std::unique_ptr<SensorAPI> str_whe_phi;
+    std::unique_ptr<SensorAPI> latency;
     std::unique_ptr<SensorAPI> vel;
     std::unique_ptr<SensorAPI> ax;
+    std::unique_ptr<SensorAPI> str_whe_phi;
     std::unique_ptr<SensorAPI> direction;
     std::unique_ptr<DataLogger> data_logger;
+    std::unique_ptr<DataLogger> data_logger_2;
     std::shared_mutex bufferMutex;
     std::shared_mutex bufferMutex_2;
     std::unique_ptr<RingBuffer> image_buffer = nullptr;
@@ -136,8 +139,6 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     unsigned int height;
 
     // Calculate additional sleep time for frame rate control
-    // Default 60fps = 16.67ms per frame, target fps = 1000/fps ms per frame
-    // Additional sleep = (1000/fps - 1000/60) ms = (1000/fps - 16.67) ms
     const int default_fps = 60;
     int additional_sleep_ms = 0;
     if (fps < default_fps)
@@ -150,12 +151,6 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
 
     while (!signal)
     {
-        // pImage = camera->GetNextImage();
-        // if (camera_2)
-        // {
-        //     pImage_2 = camera_2->GetNextImage();
-        // }
-
         pImage = vehicle_direction == FORWARD ? camera->GetNextImage() : camera_2->GetNextImage();
 
         if (pImage->IsIncomplete())
@@ -206,7 +201,6 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
 
             // Initialize other components
             gamma_controller = std::make_unique<PIDGammaController>(0.0003, 0.0001, 0.000001, 0.25, 4.0, 0.01);
-            stream_image = std::make_unique<StreamImage>(width, height);
 
             // Initialize ring buffer for variable delay, BayerRG format (1 bytes per pixel)
             if (delay_ms > 0)
@@ -214,14 +208,6 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 image_buffer = std::make_unique<RingBuffer>(delay_ms, fps, width, height, 1);
                 std::cout << "[spinnaker stream] Ring buffer initialized for " << delay_ms << "ms delay" << std::endl;
             }
-
-            // if (camera_2)
-            // {
-            // converter_bayer2rgb_2 = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2RGB);
-            // rgb_2 = get_cuda_buffer(width * height * 3);
-            // reverse_camera = std::make_shared<ImageComponent_2>(1536, 456, 768, 512, 3072, 2048);
-            // stream_image->add_component("reverse_camera", std::static_pointer_cast<Component>(reverse_camera));
-            // }
 
             std::cout << "[spinnaker stream] Converting to YUYV422 format..." << std::endl;
             is_init = true;
@@ -240,12 +226,6 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             converter_bayer2rgb->convert(bayer, rgb);
         }
 
-        // if (camera_2)
-        // {
-        //     bayer_2 = static_cast<unsigned char *>(pImage_2->GetData());
-        //     converter_bayer2rgb_2->convert(bayer_2, rgb_2);
-        // }
-
         // Add components to the image
         if (is_sensor_connected)
         {
@@ -253,46 +233,53 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             {
                 buffer = new char[BUFFER_SIZE];
                 buffer_2 = new char[BUFFER_SIZE];
-                prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
-                                                                   "homography_calibration.yaml", width, height);
-                velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
-                latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
-                str_whe_phi = std::make_unique<SensorAPI>(RemoteSteeringAngle, buffer, BUFFER_SIZE, bufferMutex);
-                vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
-                ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
+                if (is_hmi)
+                {
+                    vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
+                    ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
+                    str_whe_phi = std::make_unique<SensorAPI>(RefStrAngle, buffer_2, BUFFER_SIZE, bufferMutex_2);
+                    latency = std::make_unique<SensorAPI>(Latency, buffer_2, BUFFER_SIZE, bufferMutex_2);
+                    stream_image = std::make_unique<StreamImage>(width, height);
+                    prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
+                                                                       "homography_calibration.yaml", width, height);
+                    velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
+                    latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
+                    stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
+                    stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
+                    stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
+                }
                 direction = std::make_unique<SensorAPI>(Direction, buffer_2, BUFFER_SIZE, bufferMutex_2);
                 if (logger)
                 {
-                    data_logger = std::make_unique<DataLogger>(_data_logger_ids, 3, buffer, BUFFER_SIZE, bufferMutex, logger);
+                    data_logger = std::make_unique<DataLogger>(_data_logger_ids, _data_logger_type, DATA_NUM, buffer, BUFFER_SIZE, bufferMutex, logger);
+                    std::string logger_2 = std::string(logger);
+                    size_t pos = logger_2.find(".csv");
+                    if (pos != std::string::npos) {
+                        logger_2.insert(pos, "_2");
+                    }
+                    data_logger_2 = std::make_unique<DataLogger>(_data_logger_ids_2, _data_logger_type_2, DATA_NUM_2, buffer_2, BUFFER_SIZE, bufferMutex_2, logger_2.c_str());
                 }
                 sensor_thread = std::thread(receive_data_loop, bridge, buffer, BUFFER_SIZE, std::ref(bufferMutex),
                                             std::ref(thread_signal), std::ref(is_thread_running));
                 sensor_thread_2 = std::thread(receive_data_loop, bridge_2, buffer_2, BUFFER_SIZE, std::ref(bufferMutex_2),
                                               std::ref(thread_signal), std::ref(is_thread_running_2));
-                stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
-                stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
-                stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
-                latency_label->update(std::to_string(delay_ms) + " ms");
                 is_sensor_init = true;
             }
-            if (vehicle_direction == FORWARD)
+            if (vehicle_direction == FORWARD && is_hmi)
             {
                 prediction_line->update(vel->get_float_value() * 3.6f, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), 0.0);
                 velocity->update(to_string(static_cast<int>(vel->get_float_value() * 3.6f)));
+                latency_label->update(std::to_string(delay_ms + latency->get_int_value()) + " ms");
                 *stream_image >> rgb;
             }
             if (logger)
             {
                 data_logger->logger();
+                data_logger_2->logger();
             }
             vehicle_direction = direction->get_int_value();
             vehicle_direction = (vehicle_direction == 1) ? FORWARD : vehicle_direction;
         }
-        // if (camera_2)
-        // {
-        //     reverse_camera->update(rgb_2);
-        // }
-        // *stream_image >> rgb;
         converter_rgb2yuyv->convert(rgb, yuyv);
 
         // Adjust the gamma value based on the mean Y value in the center ROI
@@ -382,11 +369,6 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         {
             image_buffer.reset();
         }
-        // if (camera_2)
-        // {
-        //     free_cuda_buffer(rgb_2);
-        //     rgb_2 = nullptr;
-        // }
         is_init = false;
     }
     pImage = nullptr;

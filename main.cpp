@@ -21,10 +21,10 @@
 
 bool capture_signal = false;
 
-void run_spinnaker_stream(const char *videoDevice, const char *ip, int port, int fps, int delay_ms, const char *logger)
+void run_spinnaker_stream(const char *videoDevice, const char *ip, int port, int fps, int delay_ms, const char *logger, const bool is_hmi)
 {
     std::cout << "[main] Starting to capture frames from the FLIR camera..." << std::endl;
-    capture_frames(videoDevice, ip, port, capture_signal, fps, delay_ms, logger);
+    capture_frames(videoDevice, ip, port, capture_signal, fps, delay_ms, logger, is_hmi);
     std::cout << "[main] Capture process finished" << std::endl;
 }
 
@@ -91,12 +91,13 @@ int main(int argc, char *argv[])
 
     if (args.find("-h") != args.end())
     {
-        std::cout << "[main] Usage: " << argv[0] << " [-d <video_device>] [-s [-ip <ip>] [-p <port>]]" << std::endl;
+        std::cout << "[main] Usage: " << argv[0] << " [-d <video_device>] [-s [-ip <ip>] [-p <port>] [-hmi]]" << std::endl;
         std::cout << "[main] Options:" << std::endl;
         std::cout << "[main]   -d <video_device>    Specify the video device to capture frames from (default: /dev/video16)" << std::endl;
         std::cout << "[main]   -fps <fps>           Specify the frames per second (default: 60)" << std::endl;
-        std::cout << "[main]   -delay <ms>          Specify the delay in milliseconds for video output (default: 150)" << std::endl;
+        std::cout << "[main]   -delay <ms>          Specify the delay in milliseconds for video output (default: 0)" << std::endl;
         std::cout << "[main]   -s                   Add the sensor data to the video stream" << std::endl;
+        std::cout << "[main]   -hmi                 Add HMI to the stream" << std::endl;
         std::cout << "[main]   -ip <ip>             Specify the IP address to stream frames to (default: 0.0.0.0)" << std::endl;
         std::cout << "[main]   -p <port>            Specify the port to stream frames to (default: 10086)" << std::endl;
         std::cout << "[main]   -log <logger_file>   Specify the logger file to log sensor data" << std::endl;
@@ -208,9 +209,22 @@ int main(int argc, char *argv[])
     {
         logger = nullptr;
     }
+
+    bool is_hmi;
+    if (args.find("-hmi") != args.end())
+    {
+        is_hmi = true;
+        std::cout << "[main] HMI mode enabled" << std::endl;
+    }
+    else
+    {
+        is_hmi = false;
+        std::cout << "[main] HMI mode disabled" << std::endl;
+    }
+
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
 
-    run_spinnaker_stream(videoDevice, ip, port, fps, delay_ms, logger);
+    run_spinnaker_stream(videoDevice, ip, port, fps, delay_ms, logger, is_hmi);
     return 0;
 }
