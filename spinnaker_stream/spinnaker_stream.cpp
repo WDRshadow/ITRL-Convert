@@ -24,7 +24,7 @@
 #define DATA_NUM 3
 const int _data_logger_ids[] = {IncPkgNr, Velocity, AX};
 const int _data_logger_type[] = {_TYPE_INT, _TYPE_FLOAT, _TYPE_FLOAT};
-#define DATA_NUM_2 4
+#define DATA_NUM_2 5
 const int _data_logger_ids_2[] = {PkgNr, RefStrAngle, RefThrottle, RefBrk, Direction};
 const int _data_logger_type_2[] = {_TYPE_INT, _TYPE_FLOAT, _TYPE_FLOAT, _TYPE_FLOAT, _TYPE_INT};
 #define DATA_NUM_3 1
@@ -251,6 +251,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             {
                 buffer = new char[BUFFER_SIZE];
                 buffer_2 = new char[BUFFER_SIZE];
+                buffer_3 = new char[BUFFER_SIZE];
                 if (is_hmi)
                 {
                     vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
