@@ -1,6 +1,7 @@
 #include <thread>
 #include <gtest/gtest.h>
 #include <shared_mutex>
+#include <cstring>
 
 #include "socket_bridge.h"
 #include "sensor.h"
@@ -23,21 +24,21 @@ int main(int argc, char **argv)
 TEST(SOCKET_BRIDGE, RECEIVE)
 {
     const SocketBridge socket(IP_ADDRESS, PORT);
-    char* buffer = new char[BUFFER_SIZE];
+    char *buffer = new char[BUFFER_SIZE];
     EXPECT_EQ(socket.isValid(), 1);
-    std::shared_mutex bufferMutex;
     socket.receiveData(buffer, BUFFER_SIZE);
     for (int i = 0; i < NUM_FLOATS; i++)
     {
-        float f = getFloatAt(buffer, i);
-        EXPECT_EQ(f, i);
+        float value;
+        std::memcpy(&value, buffer + i * sizeof(float), sizeof(float));
+        EXPECT_EQ(value, i);
     }
 }
 
 TEST(SOCKET_BRIDGE, ASYNC)
 {
     std::shared_mutex bufferMutex;
-    char* buffer = new char[BUFFER_SIZE];
+    char *buffer = new char[BUFFER_SIZE];
     SocketBridge bridge(IP_ADDRESS, PORT);
     bool flag = false;
     bool isRunning = false;
@@ -46,8 +47,9 @@ TEST(SOCKET_BRIDGE, ASYNC)
     for (int i = 0; i < NUM_FLOATS; i++)
     {
         std::shared_lock lock(bufferMutex);
-        float f = getFloatAt(buffer, i);
-        EXPECT_EQ(f, i);
+        float value;
+        std::memcpy(&value, buffer + i * sizeof(float), sizeof(float));
+        EXPECT_EQ(value, i);
     }
     flag = true;
     if (t.joinable())
@@ -61,7 +63,9 @@ TEST(SOCKET_BRIDGE, ASYNC)
         {
             std::cerr << "[socket bridge] Sensor thread did not exit gracefully" << std::endl;
             t.detach();
-        } else {
+        }
+        else
+        {
             t.join();
         }
     }
@@ -70,7 +74,7 @@ TEST(SOCKET_BRIDGE, ASYNC)
 TEST(SOCKET_BRIDGE, VELOCITY)
 {
     std::shared_mutex bufferMutex;
-    char* buffer = new char[BUFFER_SIZE];
+    char *buffer = new char[BUFFER_SIZE];
     SocketBridge bridge(IP_ADDRESS, PORT);
     bool flag = false;
     bool isRunning = false;
@@ -90,7 +94,9 @@ TEST(SOCKET_BRIDGE, VELOCITY)
         {
             std::cerr << "[socket bridge] Sensor thread did not exit gracefully" << std::endl;
             t.detach();
-        } else {
+        }
+        else
+        {
             t.join();
         }
     }

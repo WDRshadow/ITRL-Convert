@@ -41,7 +41,6 @@ class SensorAPI
     const int id;
     const int buffer_size;
     char* buffer;
-    char* local_buffer;
     std::shared_mutex& bufferMutex;
 
 public:
@@ -49,8 +48,5 @@ public:
     [[nodiscard]] float get_float_value() const;
     [[nodiscard]] int get_int_value() const;
 };
-
-float getFloatAt(const char* buffer, int id);
-int getIntAt(const char* buffer, int id);
 
 #endif //SENSOR_H

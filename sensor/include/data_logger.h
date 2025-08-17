@@ -16,7 +16,6 @@ class DataLogger
     const int value_count;
     const int buffer_size;
     char *buffer;
-    char *local_buffer;
     std::shared_mutex &bufferMutex;
     std::string file_name;
     unsigned int frame_counter = 0;
