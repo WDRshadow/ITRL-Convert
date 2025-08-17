@@ -33,7 +33,8 @@
 #define RefBrk 3
 #define Direction 4
 #define Model_1 5
-#define Latency 6
+
+#define Latency 0
 
 class SensorAPI
 {
