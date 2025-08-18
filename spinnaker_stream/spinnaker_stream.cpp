@@ -56,7 +56,7 @@ std::thread sensor_thread;
 std::thread sensor_thread_2;
 std::thread sensor_thread_3;
 
-void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps, const int delay_ms, const char *logger, const bool is_hmi)
+void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps, const int delay_ms, const char *logger, const bool is_hmi, const bool is_p_hmi)
 {
     // Open the virtual V4L2 device
     video_fd = open(video_device, O_WRONLY);
@@ -252,7 +252,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                 buffer = new char[BUFFER_SIZE];
                 buffer_2 = new char[BUFFER_SIZE];
                 buffer_3 = new char[BUFFER_SIZE];
-                if (is_hmi)
+                if (is_hmi || is_p_hmi)
                 {
                     vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
                     ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
@@ -287,10 +287,17 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                                               std::ref(thread_signal), std::ref(is_thread_running_3));
                 is_sensor_init = true;
             }
-            if (vehicle_direction == FORWARD && is_hmi)
+            if (vehicle_direction == FORWARD && (is_hmi || is_p_hmi))
             {
                 const int total_delay = delay_ms + latency->get_int_value() + 80;
-                prediction_line->update(vel->get_float_value() * 3.6f, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), total_delay / 1000);
+                if (is_p_hmi)
+                {
+                    prediction_line->update(vel->get_float_value() * 3.6f, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), total_delay / 1000);
+                }
+                else
+                {
+                    prediction_line->update(vel->get_float_value() * 3.6f, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), 0);
+                }
                 velocity->update(to_string(static_cast<int>(vel->get_float_value() * 3.6f)));
                 // latency_label->update(std::to_string(total_delay) + " ms");
                 *stream_image >> rgb;
