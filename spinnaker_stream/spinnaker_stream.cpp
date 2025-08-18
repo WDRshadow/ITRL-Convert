@@ -262,10 +262,10 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                     prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
                                                                        "homography_calibration.yaml", width, height);
                     velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
-                    latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
+                    // latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
                     stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
                     stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
-                    stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
+                    // stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
                 }
                 direction = std::make_unique<SensorAPI>(Direction, buffer_2, BUFFER_SIZE, bufferMutex_2);
                 if (logger)
@@ -289,10 +289,10 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             }
             if (vehicle_direction == FORWARD && is_hmi)
             {
-                const int total_delay = delay_ms + latency->get_int_value();
+                const int total_delay = delay_ms + latency->get_int_value() + 80;
                 prediction_line->update(vel->get_float_value() * 3.6f, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), total_delay / 1000);
                 velocity->update(to_string(static_cast<int>(vel->get_float_value() * 3.6f)));
-                latency_label->update(std::to_string(total_delay) + " ms");
+                // latency_label->update(std::to_string(total_delay) + " ms");
                 *stream_image >> rgb;
             }
             if (logger)
@@ -308,7 +308,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         // Adjust the gamma value based on the mean Y value in the center ROI
         if (vehicle_direction == FORWARD && gamma_controller)
         {
-            double meanY = computeROImeanY(yuyv, height, width, height / 4, width / 4);
+            double meanY = computeROImeanY(yuyv, height, width, height / 4, width / 2);
             if (meanY > 0.0)
             {
                 const double gamma_current = camera->Gamma.GetValue();
