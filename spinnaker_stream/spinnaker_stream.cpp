@@ -290,7 +290,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             if (vehicle_direction == FORWARD && is_hmi)
             {
                 const int total_delay = delay_ms + latency->get_int_value();
-                prediction_line->update(vel->get_float_value() * 3.6f, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), total_delay);
+                prediction_line->update(vel->get_float_value() * 3.6f, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), total_delay / 1000);
                 velocity->update(to_string(static_cast<int>(vel->get_float_value() * 3.6f)));
                 latency_label->update(std::to_string(total_delay) + " ms");
                 *stream_image >> rgb;
