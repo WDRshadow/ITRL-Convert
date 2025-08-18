@@ -103,7 +103,7 @@ void PredictionLine::update(const float v, const float a, float str_whe_phi_remo
     const auto [x, y, theta] = predictCYRA(v, a, omega, THETA0, latency);
     Point2f origin = {
         static_cast<float>(ORIGIN_X + y * PIXELS_PER_METER),
-        static_cast<float>(ORIGIN_Y - x * PIXELS_PER_METER)
+        static_cast<float>(ORIGIN_Y - x * PIXELS_PER_METER - 100)
     };
     vector<Point2f> lines = create_line(origin, theta, PIXELS_PER_METER, 50);
     // KBM Model-----------------------------------------------------------------------------------

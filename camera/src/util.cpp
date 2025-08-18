@@ -9,7 +9,7 @@ void operator+=(Mat& lhs, const vector<Point2f>& rhs)
 {
     for (const auto& p : rhs)
     {
-        circle(lhs, p, 3, Scalar(255, 255, 255), FILLED);
+        circle(lhs, p, 6, Scalar(54, 51, 226), FILLED);
     }
 }
 
@@ -63,7 +63,7 @@ Mat draw_text(const string& str, const int width, const int height)
     int baseline = 0;
     Size text_size = getTextSize(str, FONT_HERSHEY_SIMPLEX, scale, thickness, &baseline);
     Point text_origin((width - text_size.width) / 2, (height + text_size.height) / 2);
-    putText(image, str, text_origin, FONT_HERSHEY_SIMPLEX, scale, Scalar(255, 255, 255), thickness);
+    putText(image, str, text_origin, FONT_HERSHEY_SIMPLEX, scale, Scalar(255, 0, 0), thickness);
     return image;
 }
 
