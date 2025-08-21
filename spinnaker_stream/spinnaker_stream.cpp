@@ -18,7 +18,7 @@
 
 #define BUFFER_SIZE 2048
 #define CUDA_STREAMS 8
-#define Y_TARGET 115.0
+#define Y_TARGET 100.0
 #define FORWARD 0
 
 #define DATA_NUM 3
@@ -83,6 +83,17 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         std::cerr << "[spinnaker stream] More than one camera detected, adding the reverse camera." << std::endl;
         camera_2 = camList.GetByIndex(1);
         camera_2->Init();
+        Spinnaker::GenApi::INodeMap& nodeMap = camera_2->GetNodeMap();
+        Spinnaker::GenApi::CBooleanPtr ptrReverseX = nodeMap.GetNode("ReverseX");
+        if (Spinnaker::GenApi::IsAvailable(ptrReverseX) && Spinnaker::GenApi::IsWritable(ptrReverseX))
+        {
+            ptrReverseX->SetValue(true);
+            std::cout << "[spinnaker stream] Used ReverseX for reverse camera." << std::endl;
+        }
+        else
+        {
+            std::cout << "[spinnaker stream] ReverseX is not support." << std::endl;
+        }
         camera_2->BeginAcquisition();
     }
 
@@ -289,16 +300,17 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             }
             if (vehicle_direction == FORWARD && (is_hmi || is_p_hmi))
             {
+                const auto _vel = vel->get_float_value();
                 const int total_delay = delay_ms + latency->get_int_value() + 80;
                 if (is_p_hmi)
                 {
-                    prediction_line->update(vel->get_float_value() * 3.6f, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), total_delay / 1000.0);
+                    prediction_line->update(_vel, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), total_delay / 1000.0);
                 }
                 else
                 {
-                    prediction_line->update(vel->get_float_value() * 3.6f, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), 0);
+                    prediction_line->update(_vel, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), 0);
                 }
-                velocity->update(to_string(static_cast<int>(vel->get_float_value() * 3.6f)));
+                velocity->update(to_string(static_cast<int>(_vel)));
                 // latency_label->update(std::to_string(total_delay) + " ms");
                 *stream_image >> rgb;
             }
