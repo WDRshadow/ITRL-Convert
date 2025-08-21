@@ -76,14 +76,26 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     }
     camera = camList.GetByIndex(0);
     camera->Init();
-    camera->BeginAcquisition();
     camera->GammaEnable.SetValue(true);
+    try
+    {
+        auto &nodeMap = camera->GetNodeMap();
+        Spinnaker::GenApi::CEnumerationPtr ptrAutoXLightingMode = nodeMap.GetNode("AutoExposureLightingMode");
+        Spinnaker::GenApi::CEnumEntryPtr ptrAutoXLightingModeFrontlight = ptrAutoXLightingMode->GetEntryByName("Frontlight");
+        ptrAutoXLightingMode->SetIntValue(ptrAutoXLightingModeFrontlight->GetValue());
+    }
+    catch (const Spinnaker::Exception &e)
+    {
+        std::cerr << "[spinnaker stream] Exception: " << e.what() << std::endl;
+    }
+    camera->BeginAcquisition();
+    
     if (camList.GetSize() > 1)
     {
         std::cerr << "[spinnaker stream] More than one camera detected, adding the reverse camera." << std::endl;
         camera_2 = camList.GetByIndex(1);
         camera_2->Init();
-        Spinnaker::GenApi::INodeMap& nodeMap = camera_2->GetNodeMap();
+        Spinnaker::GenApi::INodeMap &nodeMap = camera_2->GetNodeMap();
         Spinnaker::GenApi::CBooleanPtr ptrReverseX = nodeMap.GetNode("ReverseX");
         if (Spinnaker::GenApi::IsAvailable(ptrReverseX) && Spinnaker::GenApi::IsWritable(ptrReverseX))
         {
