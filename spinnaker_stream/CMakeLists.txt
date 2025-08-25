@@ -14,7 +14,7 @@ add_library(spinnaker_stream
 target_include_directories(spinnaker_stream
         PUBLIC
         .
-        /usr/include/spinnaker
+        /opt/spinnaker/include
         ${OpenCV_INCLUDE_DIRS}
         ${CMAKE_SOURCE_DIR}/sensor/include
         ${CMAKE_SOURCE_DIR}/cuda

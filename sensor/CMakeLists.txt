@@ -10,6 +10,7 @@ add_library(sensor
         STATIC
         src/sensor.cpp
         src/socket_bridge.cpp
+        src/data_logger.cpp
 )
 
 add_subdirectory(tests)

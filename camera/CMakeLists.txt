@@ -16,10 +16,12 @@ link_libraries(${OpenCV_LIBS})
 
 add_library(camera
         STATIC
+        src/ring_buffer.cpp
         src/fisheye.cpp
         src/homography.cpp
         src/util.cpp
         src/component.cpp
+        src/gamma.cpp
 )
 
 set_target_properties(camera PROPERTIES
