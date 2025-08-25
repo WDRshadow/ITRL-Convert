@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(RCVE-Stream LANGUAGES CXX CUDA)
+project(FLIR-Stream LANGUAGES CXX CUDA)
 
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_ARCHITECTURES 72)

@@ -54,7 +54,6 @@ void run_hc()
     const Homography homography(&src, &dst);
     homography.save("homography_calibration.yaml");
 }
-
 void signalHandler(int signum)
 {
     std::cout << "[main] Received signal " << signum << ", cleaning up resources..." << std::endl;

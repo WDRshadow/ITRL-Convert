@@ -19,10 +19,10 @@ rcve_stop.sh
 mkdir build
 cd build
 cmake ..
-make
+make -j
 ```
 
-You can find the binary file `rcve_stream` in the `build` directory.
+You can find the binary file `flir_stream` in the `build` directory.
 
 # Run the video stream
 
@@ -30,7 +30,6 @@ First prepare the video devices for receiving the processed video. To do this, r
 ```bash
 sudo rmmod v4l2loopback
 sudo modprobe v4l2loopback video_nr=16 card_label="RCVECamera" exclusive_caps=1
-
 ```
 
 Then, you can start streaming video to the first video device by running the binary built in the previous step in `build` folder with
