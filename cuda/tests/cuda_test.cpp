@@ -2,11 +2,35 @@
 #include <gtest/gtest.h>
 
 #include "formatting.h"
+#include "resolution.h"
 
 int main(int argc, char **argv)
 {
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
+}
+
+TEST(RESOLUTION, Resolution)
+{
+    int width  = 2;
+    int height = 2;
+
+    unsigned char* rgbHost = new unsigned char[width * height * 3];
+    unsigned char* rgbHost2 = new unsigned char[width * height * 3 / (SCALE_2 * SCALE_2)];
+
+    for(int i = 0; i < width * height * 3; ++i)
+    {
+        rgbHost[i] = static_cast<unsigned char>(1);
+    }
+    
+    CudaResolution converter(width, height, 1, SCALE_2);
+    converter.convert(rgbHost, rgbHost2);
+
+    EXPECT_EQ(rgbHost2[0], 1);
+    std::cout << "[cuda] Resolution done for " << width / SCALE_2 << "x" << height / SCALE_2 << "." << std::endl;
+
+    delete[] rgbHost;
+    delete[] rgbHost2;
 }
 
 TEST(CUDA, H_MEM)

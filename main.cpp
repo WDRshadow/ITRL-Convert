@@ -18,13 +18,14 @@
 #define DEFAULT_PORT 10086
 #define DEFAULT_FPS 60
 #define DEFAULT_DELAY_MS 0
+#define DEFAULT_SCALE 1
 
 bool capture_signal = false;
 
-void run_spinnaker_stream(const char *videoDevice, const char *ip, int port, int fps, int delay_ms, const char *logger, const bool is_hmi, const bool is_p_hmi)
+void run_spinnaker_stream(const char *videoDevice, const char *ip, int port, int fps, int delay_ms, const char *logger, const bool is_hmi, const bool is_p_hmi, const int scale)
 {
     std::cout << "[main] Starting to capture frames from the FLIR camera..." << std::endl;
-    capture_frames(videoDevice, ip, port, capture_signal, fps, delay_ms, logger, is_hmi, is_p_hmi);
+    capture_frames(videoDevice, ip, port, capture_signal, fps, delay_ms, logger, is_hmi, is_p_hmi, scale);
     std::cout << "[main] Capture process finished" << std::endl;
 }
 
@@ -94,6 +95,7 @@ int main(int argc, char *argv[])
         std::cout << "[main] Options:" << std::endl;
         std::cout << "[main]   -d <video_device>    Specify the video device to capture frames from (default: /dev/video16)" << std::endl;
         std::cout << "[main]   -fps <fps>           Specify the frames per second (default: 60)" << std::endl;
+        std::cout << "[main]   -scale <scale>       Specify the scale of the frame size (default: 1)" << std::endl;
         std::cout << "[main]   -delay <ms>          Specify the delay in milliseconds for video output (default: 0)" << std::endl;
         std::cout << "[main]   -s                   Add the sensor data to the video stream" << std::endl;
         std::cout << "[main]   -hmi                 Add HMI to the stream" << std::endl;
@@ -234,9 +236,20 @@ int main(int argc, char *argv[])
         std::cout << "[main] P-HMI mode disabled" << std::endl;
     }
 
+    int scale;
+    if (args.find("-scale") != args.end())
+    {
+        scale = std::stoi(args["-scale"]);
+    }
+    else
+    {
+        scale = DEFAULT_SCALE;
+    }
+    std::cout << "[main] Using scale: " << scale << std::endl;
+
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
 
-    run_spinnaker_stream(videoDevice, ip, port, fps, delay_ms, logger, is_hmi, is_p_hmi);
+    run_spinnaker_stream(videoDevice, ip, port, fps, delay_ms, logger, is_hmi, is_p_hmi, scale);
     return 0;
 }

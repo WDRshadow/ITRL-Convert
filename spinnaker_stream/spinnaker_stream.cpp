@@ -10,6 +10,7 @@
 #include "spinnaker_stream.h"
 #include "component.h"
 #include "formatting.h"
+#include "resolution.h"
 #include "socket_bridge.h"
 #include "sensor.h"
 #include "data_logger.h"
@@ -51,12 +52,13 @@ bool is_thread_running_2 = false;
 bool is_thread_running_3 = false;
 unsigned char *bayer = nullptr;
 unsigned char *rgb = nullptr;
+unsigned char *new_rgb = nullptr;
 unsigned char *yuyv = nullptr;
 std::thread sensor_thread;
 std::thread sensor_thread_2;
 std::thread sensor_thread_3;
 
-void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps, const int delay_ms, const char *logger, const bool is_hmi, const bool is_p_hmi)
+void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps, const int delay_ms, const char *logger, const bool is_hmi, const bool is_p_hmi, const int scale)
 {
     // Open the virtual V4L2 device
     video_fd = open(video_device, O_WRONLY);
@@ -89,7 +91,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         std::cerr << "[spinnaker stream] Exception: " << e.what() << std::endl;
     }
     camera->BeginAcquisition();
-    
+
     if (camList.GetSize() > 1)
     {
         std::cerr << "[spinnaker stream] More than one camera detected, adding the reverse camera." << std::endl;
@@ -175,7 +177,10 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     std::unique_ptr<CudaImageConverter> converter_rgb2yuyv;
     std::unique_ptr<CudaImageConverter> converter_bayer2rgb_2;
     std::unique_ptr<PIDGammaController> gamma_controller;
+    std::unique_ptr<CudaResolution> converter_resolution;
 
+    unsigned int orin_width;
+    unsigned int orin_height;
     unsigned int width;
     unsigned int height;
 
@@ -204,9 +209,21 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         if (!is_init)
         {
             // Get the image size
-            width = pImage->GetWidth();
-            height = pImage->GetHeight();
-            std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
+            orin_width = pImage->GetWidth();
+            orin_height = pImage->GetHeight();
+            if (scale != 1 && scale > 0)
+            {
+                width = orin_width / scale;
+                height = orin_height / scale;
+                converter_resolution = std::make_unique<CudaResolution>(pImage->GetWidth(), pImage->GetHeight(), CUDA_STREAMS, scale);
+                new_rgb = get_cuda_buffer(width * height * 3);
+            }
+            else
+            {
+                width = orin_width;
+                height = orin_height;
+            }
+            std::cout << "[spinnaker stream] Image size: " << width << "x" << height << std::endl;
 
             // Set the video device format
             struct v4l2_format vfmt = {};
@@ -235,9 +252,9 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             }
 
             // Initialize CUDA and allocate memory for
-            converter_bayer2rgb = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2RGB);
+            converter_bayer2rgb = std::make_unique<CudaImageConverter>(orin_width, orin_height, CUDA_STREAMS, BAYER2RGB);
             converter_rgb2yuyv = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, RGB2YUYV);
-            rgb = get_cuda_buffer(width * height * 3);
+            rgb = get_cuda_buffer(orin_width * orin_height * 3);
             yuyv = get_cuda_buffer(width * height * 2);
 
             // Initialize other components
@@ -246,7 +263,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             // Initialize ring buffer for variable delay, BayerRG format (1 bytes per pixel)
             if (delay_ms > 0)
             {
-                image_buffer = std::make_unique<RingBuffer>(delay_ms, fps, width, height, 1);
+                image_buffer = std::make_unique<RingBuffer>(delay_ms, fps, orin_width, orin_height, 1);
                 std::cout << "[spinnaker stream] Ring buffer initialized for " << delay_ms << "ms delay" << std::endl;
             }
 
@@ -281,9 +298,9 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                     ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
                     str_whe_phi = std::make_unique<SensorAPI>(RefStrAngle, buffer_2, BUFFER_SIZE, bufferMutex_2);
                     latency = std::make_unique<SensorAPI>(Latency, buffer_3, BUFFER_SIZE, bufferMutex_3);
-                    stream_image = std::make_unique<StreamImage>(width, height);
+                    stream_image = std::make_unique<StreamImage>(orin_width, orin_height);
                     prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
-                                                                       "homography_calibration.yaml", width, height);
+                                                                       "homography_calibration.yaml", orin_width, orin_height);
                     velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
                     // latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
                     stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
@@ -334,7 +351,16 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             vehicle_direction = direction->get_int_value();
             vehicle_direction = (vehicle_direction == 1) ? FORWARD : vehicle_direction;
         }
-        converter_rgb2yuyv->convert(rgb, yuyv);
+
+        if (scale != 1 && scale > 0 && converter_resolution)
+        {
+            converter_resolution->convert(rgb, new_rgb);
+            converter_rgb2yuyv->convert(new_rgb, yuyv);
+        }
+        else
+        {
+            converter_rgb2yuyv->convert(rgb, yuyv);
+        }
 
         // Adjust the gamma value based on the mean Y value in the center ROI
         if (vehicle_direction == FORWARD && gamma_controller)

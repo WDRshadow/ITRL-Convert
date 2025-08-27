@@ -10,6 +10,7 @@ set(CMAKE_CUDA_ARCHITECTURES 72)
 add_library(cuda
         STATIC
         formatting.cu
+        resolution.cu
 )
 
 add_subdirectory(tests)
