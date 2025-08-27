@@ -81,26 +81,119 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     camera->GammaEnable.SetValue(true);
     try
     {
-        auto &nodeMap = camera->GetNodeMap();
+        auto &nm = camera->GetNodeMap();
 
-        Spinnaker::GenApi::CEnumerationPtr ptrExposureAuto = nodeMap.GetNode("ExposureAuto");
-        Spinnaker::GenApi::CEnumEntryPtr ptrExposureAutoCts = ptrExposureAuto->GetEntryByName("Continuous");
-        ptrExposureAuto->SetIntValue(ptrExposureAutoCts->GetValue());
+        auto writable = [](Spinnaker::GenApi::INode *n)
+        {
+            return Spinnaker::GenApi::IsAvailable(n) && Spinnaker::GenApi::IsWritable(n);
+        };
 
-        Spinnaker::GenApi::CBooleanPtr ptrAasRoiEnable = nodeMap.GetNode("AasRoiEnable");
-        ptrAasRoiEnable->SetValue(true);
-        Spinnaker::GenApi::CEnumerationPtr ptrAutoAlgorithmSelector = nodeMap.GetNode("AutoAlgorithmSelector");
-        Spinnaker::GenApi::CEnumEntryPtr ptrAutoAlgorithmSelectorAE = ptrAutoAlgorithmSelector->GetEntryByName("Ae");
-        ptrAutoAlgorithmSelector->SetIntValue(ptrAutoAlgorithmSelectorAE->GetValue());
+        {
+            auto e = Spinnaker::GenApi::CEnumerationPtr(nm.GetNode("ExposureAuto"));
+            auto off = e->GetEntryByName("Off");
+            e->SetIntValue(off->GetValue());
+        }
 
-        Spinnaker::GenApi::CIntegerPtr ptrAasRoiHeight = nodeMap.GetNode("AasRoiHeight");
-        ptrAasRoiHeight->SetValue(512);
-        Spinnaker::GenApi::CIntegerPtr ptrAasRoiWidth = nodeMap.GetNode("AasRoiWidth");
-        ptrAasRoiWidth->SetValue(1536);
-        Spinnaker::GenApi::CIntegerPtr ptrAasRoiOffsetX = nodeMap.GetNode("AasRoiOffsetX");
-        ptrAasRoiOffsetX->SetValue(768);
-        Spinnaker::GenApi::CIntegerPtr ptrAasRoiOffsetY = nodeMap.GetNode("AasRoiOffsetY");
-        ptrAasRoiOffsetY->SetValue(768);
+        {
+            auto m = Spinnaker::GenApi::CEnumerationPtr(nm.GetNode("AutoExposureLightingMode"));
+            if (Spinnaker::GenApi::IsAvailable(m) && Spinnaker::GenApi::IsWritable(m))
+            {
+                auto normal = m->GetEntryByName("Normal");
+                if (!Spinnaker::GenApi::IsAvailable(normal))
+                {
+                    auto offEnt = m->GetEntryByName("Off");
+                    if (Spinnaker::GenApi::IsAvailable(offEnt))
+                        m->SetIntValue(offEnt->GetValue());
+                }
+                else
+                {
+                    m->SetIntValue(normal->GetValue());
+                }
+            }
+        }
+
+        {
+            auto algo = Spinnaker::GenApi::CEnumerationPtr(nm.GetNode("AutoAlgorithmSelector"));
+            if (Spinnaker::GenApi::IsAvailable(algo) && Spinnaker::GenApi::IsWritable(algo))
+            {
+                auto ae = algo->GetEntryByName("Ae");
+                if (Spinnaker::GenApi::IsAvailable(ae))
+                    algo->SetIntValue(ae->GetValue());
+            }
+        }
+
+        {
+            auto en = Spinnaker::GenApi::CBooleanPtr(nm.GetNode("AasRoiEnable"));
+            if (writable(en))
+                en->SetValue(true);
+
+            auto mode = Spinnaker::GenApi::CEnumerationPtr(nm.GetNode("AasRoiMode"));
+            if (Spinnaker::GenApi::IsAvailable(mode) && Spinnaker::GenApi::IsWritable(mode))
+            {
+                auto manual = mode->GetEntryByName("Manual");
+                if (Spinnaker::GenApi::IsAvailable(manual))
+                    mode->SetIntValue(manual->GetValue());
+            }
+        }
+
+        {
+            auto W = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("Width"));
+            auto H = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("Height"));
+            auto OX = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("OffsetX"));
+            auto OY = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("OffsetY"));
+            if (writable(W) && writable(H))
+            {
+                W->SetValue(W->GetMax());
+                H->SetValue(H->GetMax());
+            }
+            if (writable(OX))
+                OX->SetValue(OX->GetMin());
+            if (writable(OY))
+                OY->SetValue(OY->GetMin());
+        }
+
+        auto clampInc = [](Spinnaker::GenApi::CIntegerPtr p, int64_t v)
+        {
+            int64_t inc = p->GetInc();
+            int64_t minv = p->GetMin();
+            int64_t maxv = p->GetMax();
+            v = std::max(minv, std::min(maxv, v));
+            if (inc > 1)
+                v = minv + ((v - minv) / inc) * inc;
+            return v;
+        };
+
+        {
+            auto h = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("AasRoiHeight"));
+            auto w = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("AasRoiWidth"));
+            auto ox = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("AasRoiOffsetX"));
+            auto oy = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("AasRoiOffsetY"));
+
+            if (!Spinnaker::GenApi::IsAvailable(h))
+                h = nm.GetNode("AutoExposureROIHeight");
+            if (!Spinnaker::GenApi::IsAvailable(w))
+                w = nm.GetNode("AutoExposureROIWidth");
+            if (!Spinnaker::GenApi::IsAvailable(ox))
+                ox = nm.GetNode("AutoExposureROIOffsetX");
+            if (!Spinnaker::GenApi::IsAvailable(oy))
+                oy = nm.GetNode("AutoExposureROIOffsetY");
+
+            if (!(writable(h) && writable(w) && writable(ox) && writable(oy)))
+            {
+                throw std::runtime_error("AAS ROI nodes are not writable; check LightingMode/Mode/UserSet.");
+            }
+
+            h->SetValue(clampInc(h, 512));
+            w->SetValue(clampInc(w, 1536));
+            ox->SetValue(clampInc(ox, 768));
+            oy->SetValue(clampInc(oy, 768));
+        }
+
+        {
+            auto e = Spinnaker::GenApi::CEnumerationPtr(nm.GetNode("ExposureAuto"));
+            auto cts = e->GetEntryByName("Continuous");
+            e->SetIntValue(cts->GetValue());
+        }
     }
     catch (const Spinnaker::Exception &e)
     {
