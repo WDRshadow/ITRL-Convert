@@ -85,6 +85,25 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         Spinnaker::GenApi::CEnumerationPtr ptrAutoXLightingMode = nodeMap.GetNode("AutoExposureLightingMode");
         Spinnaker::GenApi::CEnumEntryPtr ptrAutoXLightingModeFrontlight = ptrAutoXLightingMode->GetEntryByName("Frontlight");
         ptrAutoXLightingMode->SetIntValue(ptrAutoXLightingModeFrontlight->GetValue());
+
+        // Spinnaker::GenApi::CEnumerationPtr ptrExposureAuto = nodeMap.GetNode("ExposureAuto");
+        // Spinnaker::GenApi::CEnumEntryPtr ptrExposureAutoCts = ptrExposureAuto->GetEntryByName("Continuous");
+        // ptrExposureAuto->SetIntValue(ptrExposureAutoCts->GetValue());
+
+        // Spinnaker::GenApi::CBooleanPtr ptrAasRoiEnable = nodeMap.GetNode("AasRoiEnable");
+        // ptrAasRoiEnable->SetValue(1);
+        // Spinnaker::GenApi::CEnumerationPtr ptrAutoAlgorithmSelector = nodeMap.GetNode("AutoAlgorithmSelector");
+        // Spinnaker::GenApi::CEnumEntryPtr ptrAutoAlgorithmSelectorAE = ptrAutoAlgorithmSelector->GetEntryByName("Ae");
+        // ptrAutoAlgorithmSelector->SetIntValue(ptrAutoAlgorithmSelectorAE->GetValue());
+
+        // Spinnaker::GenApi::CIntegerPtr ptrAasRoiHeight = nodeMap.GetNode("AasRoiHeight");
+        // ptrAasRoiHeight->SetValue(512);
+        // Spinnaker::GenApi::CIntegerPtr ptrAasRoiWidth = nodeMap.GetNode("AasRoiWidth");
+        // ptrAasRoiWidth->SetValue(1536);
+        // Spinnaker::GenApi::CIntegerPtr ptrAasRoiOffsetX = nodeMap.GetNode("AasRoiOffsetX");
+        // ptrAasRoiOffsetX->SetValue(768);
+        // Spinnaker::GenApi::CIntegerPtr ptrAasRoiOffsetY = nodeMap.GetNode("AasRoiOffsetY");
+        // ptrAasRoiOffsetY->SetValue(768);
     }
     catch (const Spinnaker::Exception &e)
     {
