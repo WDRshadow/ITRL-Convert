@@ -167,7 +167,6 @@ CudaImageConverter::CudaImageConverter(unsigned int width, unsigned int height, 
       size_yuyv_block(width * block_height * 2)
 {
     blockSize = new dim3(BLOCK_SIZE);
-    streams = (cudaStream_t *)malloc(stream_num * sizeof(cudaStream_t));
     streams = new cudaStream_t[stream_num];
     for (int i = 0; i < stream_num; i++)
     {
