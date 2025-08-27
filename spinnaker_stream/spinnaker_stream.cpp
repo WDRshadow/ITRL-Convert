@@ -447,6 +447,8 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         rgb = nullptr;
         free_cuda_buffer(yuyv);
         yuyv = nullptr;
+        free_cuda_buffer(new_rgb);
+        new_rgb = nullptr;
         if (delay_ms > 0)
         {
             image_buffer.reset();

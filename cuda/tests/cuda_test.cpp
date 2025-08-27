@@ -16,7 +16,7 @@ TEST(RESOLUTION, Resolution)
     int height = 2;
 
     unsigned char* rgbHost = new unsigned char[width * height * 3];
-    unsigned char* rgbHost2 = new unsigned char[width * height * 3 / (SCALE_2 * SCALE_2)];
+    unsigned char* rgbHost2 = new unsigned char[(width / SCALE_2) * (height / SCALE_2) * 3];
 
     for(int i = 0; i < width * height * 3; ++i)
     {

@@ -57,4 +57,4 @@ public:
     void convert(const unsigned char *src, unsigned char *dst);
 };
 
-#endif // FORMATTING_H
+#endif // RESOLUTION_H
