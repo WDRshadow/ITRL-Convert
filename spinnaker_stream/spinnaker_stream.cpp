@@ -10,6 +10,7 @@
 #include "spinnaker_stream.h"
 #include "component.h"
 #include "formatting.h"
+#include "resolution.h"
 #include "socket_bridge.h"
 #include "sensor.h"
 #include "data_logger.h"
@@ -51,12 +52,13 @@ bool is_thread_running_2 = false;
 bool is_thread_running_3 = false;
 unsigned char *bayer = nullptr;
 unsigned char *rgb = nullptr;
+unsigned char *new_rgb = nullptr;
 unsigned char *yuyv = nullptr;
 std::thread sensor_thread;
 std::thread sensor_thread_2;
 std::thread sensor_thread_3;
 
-void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps, const int delay_ms, const char *logger, const bool is_hmi, const bool is_p_hmi)
+void capture_frames(const char *video_device, const std::string &ip, const int port, bool &signal, const int fps, const int delay_ms, const char *logger, const bool is_hmi, const bool is_p_hmi, const int scale)
 {
     // Open the virtual V4L2 device
     video_fd = open(video_device, O_WRONLY);
@@ -79,17 +81,126 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     camera->GammaEnable.SetValue(true);
     try
     {
-        auto &nodeMap = camera->GetNodeMap();
-        Spinnaker::GenApi::CEnumerationPtr ptrAutoXLightingMode = nodeMap.GetNode("AutoExposureLightingMode");
-        Spinnaker::GenApi::CEnumEntryPtr ptrAutoXLightingModeFrontlight = ptrAutoXLightingMode->GetEntryByName("Frontlight");
-        ptrAutoXLightingMode->SetIntValue(ptrAutoXLightingModeFrontlight->GetValue());
+        auto &nm = camera->GetNodeMap();
+
+        auto writable = [](Spinnaker::GenApi::INode *n)
+        {
+            return Spinnaker::GenApi::IsAvailable(n) && Spinnaker::GenApi::IsWritable(n);
+        };
+
+        {
+            auto e = Spinnaker::GenApi::CEnumerationPtr(nm.GetNode("ExposureAuto"));
+            auto off = e->GetEntryByName("Off");
+            e->SetIntValue(off->GetValue());
+        }
+
+        {
+            auto m = Spinnaker::GenApi::CEnumerationPtr(nm.GetNode("AutoExposureLightingMode"));
+            if (Spinnaker::GenApi::IsAvailable(m) && Spinnaker::GenApi::IsWritable(m))
+            {
+                auto normal = m->GetEntryByName("Normal");
+                if (!Spinnaker::GenApi::IsAvailable(normal))
+                {
+                    auto offEnt = m->GetEntryByName("Off");
+                    if (Spinnaker::GenApi::IsAvailable(offEnt))
+                        m->SetIntValue(offEnt->GetValue());
+                }
+                else
+                {
+                    m->SetIntValue(normal->GetValue());
+                }
+            }
+        }
+
+        {
+            auto algo = Spinnaker::GenApi::CEnumerationPtr(nm.GetNode("AutoAlgorithmSelector"));
+            if (Spinnaker::GenApi::IsAvailable(algo) && Spinnaker::GenApi::IsWritable(algo))
+            {
+                auto ae = algo->GetEntryByName("Ae");
+                if (Spinnaker::GenApi::IsAvailable(ae))
+                    algo->SetIntValue(ae->GetValue());
+            }
+        }
+
+        {
+            auto en = Spinnaker::GenApi::CBooleanPtr(nm.GetNode("AasRoiEnable"));
+            if (writable(en))
+                en->SetValue(true);
+
+            auto mode = Spinnaker::GenApi::CEnumerationPtr(nm.GetNode("AasRoiMode"));
+            if (Spinnaker::GenApi::IsAvailable(mode) && Spinnaker::GenApi::IsWritable(mode))
+            {
+                auto manual = mode->GetEntryByName("Manual");
+                if (Spinnaker::GenApi::IsAvailable(manual))
+                    mode->SetIntValue(manual->GetValue());
+            }
+        }
+
+        {
+            auto W = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("Width"));
+            auto H = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("Height"));
+            auto OX = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("OffsetX"));
+            auto OY = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("OffsetY"));
+            if (writable(W) && writable(H))
+            {
+                W->SetValue(W->GetMax());
+                H->SetValue(H->GetMax());
+            }
+            if (writable(OX))
+                OX->SetValue(OX->GetMin());
+            if (writable(OY))
+                OY->SetValue(OY->GetMin());
+        }
+
+        auto clampInc = [](Spinnaker::GenApi::CIntegerPtr p, int64_t v)
+        {
+            int64_t inc = p->GetInc();
+            int64_t minv = p->GetMin();
+            int64_t maxv = p->GetMax();
+            v = std::max(minv, std::min(maxv, v));
+            if (inc > 1)
+                v = minv + ((v - minv) / inc) * inc;
+            return v;
+        };
+
+        {
+            auto h = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("AasRoiHeight"));
+            auto w = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("AasRoiWidth"));
+            auto ox = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("AasRoiOffsetX"));
+            auto oy = Spinnaker::GenApi::CIntegerPtr(nm.GetNode("AasRoiOffsetY"));
+
+            if (!Spinnaker::GenApi::IsAvailable(h))
+                h = nm.GetNode("AutoExposureROIHeight");
+            if (!Spinnaker::GenApi::IsAvailable(w))
+                w = nm.GetNode("AutoExposureROIWidth");
+            if (!Spinnaker::GenApi::IsAvailable(ox))
+                ox = nm.GetNode("AutoExposureROIOffsetX");
+            if (!Spinnaker::GenApi::IsAvailable(oy))
+                oy = nm.GetNode("AutoExposureROIOffsetY");
+
+            if (!(writable(h) && writable(w) && writable(ox) && writable(oy)))
+            {
+                throw std::runtime_error("AAS ROI nodes are not writable; check LightingMode/Mode/UserSet.");
+            }
+
+            h->SetValue(clampInc(h, 512));
+            w->SetValue(clampInc(w, 1536));
+            ox->SetValue(clampInc(ox, 768));
+            oy->SetValue(clampInc(oy, 768));
+        }
+
+        {
+            auto e = Spinnaker::GenApi::CEnumerationPtr(nm.GetNode("ExposureAuto"));
+            auto cts = e->GetEntryByName("Continuous");
+            e->SetIntValue(cts->GetValue());
+        }
     }
     catch (const Spinnaker::Exception &e)
     {
         std::cerr << "[spinnaker stream] Exception: " << e.what() << std::endl;
     }
     camera->BeginAcquisition();
-    
+
     if (camList.GetSize() > 1)
     {
         std::cerr << "[spinnaker stream] More than one camera detected, adding the reverse camera." << std::endl;
@@ -173,9 +284,11 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     // Define the converter pointer
     std::unique_ptr<CudaImageConverter> converter_bayer2rgb;
     std::unique_ptr<CudaImageConverter> converter_rgb2yuyv;
-    std::unique_ptr<CudaImageConverter> converter_bayer2rgb_2;
     std::unique_ptr<PIDGammaController> gamma_controller;
+    std::unique_ptr<CudaResolution> converter_resolution;
 
+    unsigned int orin_width;
+    unsigned int orin_height;
     unsigned int width;
     unsigned int height;
 
@@ -188,11 +301,13 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     }
 
     // Vehicle direction
-    int vehicle_direction = FORWARD;
+    int vehicle_direction = FORWARD + 1;
+    bool isReverseX = false;
 
     while (!signal)
     {
         pImage = vehicle_direction == FORWARD ? camera->GetNextImage() : camera_2->GetNextImage();
+        isReverseX = vehicle_direction != FORWARD;
 
         if (pImage->IsIncomplete())
         {
@@ -204,9 +319,21 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         if (!is_init)
         {
             // Get the image size
-            width = pImage->GetWidth();
-            height = pImage->GetHeight();
-            std::cout << "[spinnaker stream] Image size: " << pImage->GetWidth() << "x" << pImage->GetHeight() << std::endl;
+            orin_width = pImage->GetWidth();
+            orin_height = pImage->GetHeight();
+            if (scale != 1 && scale > 0)
+            {
+                width = orin_width / scale;
+                height = orin_height / scale;
+                converter_resolution = std::make_unique<CudaResolution>(pImage->GetWidth(), pImage->GetHeight(), CUDA_STREAMS, scale);
+                new_rgb = get_cuda_buffer(width * height * 3);
+            }
+            else
+            {
+                width = orin_width;
+                height = orin_height;
+            }
+            std::cout << "[spinnaker stream] Image size: " << width << "x" << height << std::endl;
 
             // Set the video device format
             struct v4l2_format vfmt = {};
@@ -235,9 +362,9 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             }
 
             // Initialize CUDA and allocate memory for
-            converter_bayer2rgb = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, BAYER2RGB);
+            converter_bayer2rgb = std::make_unique<CudaImageConverter>(orin_width, orin_height, CUDA_STREAMS, BAYER2RGB);
             converter_rgb2yuyv = std::make_unique<CudaImageConverter>(width, height, CUDA_STREAMS, RGB2YUYV);
-            rgb = get_cuda_buffer(width * height * 3);
+            rgb = get_cuda_buffer(orin_width * orin_height * 3);
             yuyv = get_cuda_buffer(width * height * 2);
 
             // Initialize other components
@@ -246,7 +373,7 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             // Initialize ring buffer for variable delay, BayerRG format (1 bytes per pixel)
             if (delay_ms > 0)
             {
-                image_buffer = std::make_unique<RingBuffer>(delay_ms, fps, width, height, 1);
+                image_buffer = std::make_unique<RingBuffer>(delay_ms, fps, orin_width, orin_height, 1);
                 std::cout << "[spinnaker stream] Ring buffer initialized for " << delay_ms << "ms delay" << std::endl;
             }
 
@@ -260,11 +387,11 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         {
             image_buffer->update(bayer);
             unsigned char *delayed_bayer = image_buffer->get_oldest();
-            converter_bayer2rgb->convert(delayed_bayer, rgb);
+            converter_bayer2rgb->convert(delayed_bayer, rgb, isReverseX);
         }
         else
         {
-            converter_bayer2rgb->convert(bayer, rgb);
+            converter_bayer2rgb->convert(bayer, rgb, isReverseX);
         }
 
         // Add components to the image
@@ -281,9 +408,9 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
                     ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
                     str_whe_phi = std::make_unique<SensorAPI>(RefStrAngle, buffer_2, BUFFER_SIZE, bufferMutex_2);
                     latency = std::make_unique<SensorAPI>(Latency, buffer_3, BUFFER_SIZE, bufferMutex_3);
-                    stream_image = std::make_unique<StreamImage>(width, height);
+                    stream_image = std::make_unique<StreamImage>(orin_width, orin_height);
                     prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
-                                                                       "homography_calibration.yaml", width, height);
+                                                                       "homography_calibration.yaml", orin_width, orin_height);
                     velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
                     // latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
                     stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
@@ -334,7 +461,16 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
             vehicle_direction = direction->get_int_value();
             vehicle_direction = (vehicle_direction == 1) ? FORWARD : vehicle_direction;
         }
-        converter_rgb2yuyv->convert(rgb, yuyv);
+
+        if (scale != 1 && scale > 0 && converter_resolution)
+        {
+            converter_resolution->convert(rgb, new_rgb);
+            converter_rgb2yuyv->convert(new_rgb, yuyv);
+        }
+        else
+        {
+            converter_rgb2yuyv->convert(rgb, yuyv);
+        }
 
         // Adjust the gamma value based on the mean Y value in the center ROI
         if (vehicle_direction == FORWARD && gamma_controller)
@@ -421,6 +557,8 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         rgb = nullptr;
         free_cuda_buffer(yuyv);
         yuyv = nullptr;
+        free_cuda_buffer(new_rgb);
+        new_rgb = nullptr;
         if (delay_ms > 0)
         {
             image_buffer.reset();

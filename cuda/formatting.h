@@ -2,7 +2,7 @@
 #define FORMATTING_H
 
 #ifdef __CUDACC__
-__global__ void bayer2rgb_kernel(const unsigned char *bayer, unsigned char *rgb, unsigned int width, unsigned int height);
+__global__ void bayer2rgb_kernel(const unsigned char *bayer, unsigned char *rgb, unsigned int width, unsigned int height, bool isReverseX);
 __global__ void rgb2yuyv_kernel(const unsigned char *rgb, unsigned char *yuyv, unsigned int width, unsigned int height);
 #endif
 
@@ -33,6 +33,7 @@ protected:
     const unsigned int height;
     const int stream_num;
     const int mode;
+    const bool isReverseX;
 
     const unsigned int block_height;
     const size_t size_bayer_block;
@@ -68,8 +69,9 @@ public:
      *
      * @param src Input data
      * @param dst Output data
+     * @param isReverseX Whether to reverse the X axis (for Bayer pattern adjustment)
      */
-    void convert(const unsigned char *src, unsigned char *dst);
+    void convert(const unsigned char *src, unsigned char *dst, bool isReverseX = false);
 };
 
 #endif // FORMATTING_H

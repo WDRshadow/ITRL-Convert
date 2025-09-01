@@ -2,11 +2,35 @@
 #include <gtest/gtest.h>
 
 #include "formatting.h"
+#include "resolution.h"
 
 int main(int argc, char **argv)
 {
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
+}
+
+TEST(RESOLUTION, Resolution)
+{
+    int width  = 2;
+    int height = 2;
+
+    unsigned char* rgbHost = new unsigned char[width * height * 3];
+    unsigned char* rgbHost2 = new unsigned char[(width / SCALE_2) * (height / SCALE_2) * 3];
+
+    for(int i = 0; i < width * height * 3; ++i)
+    {
+        rgbHost[i] = static_cast<unsigned char>(1);
+    }
+    
+    CudaResolution converter(width, height, 1, SCALE_2);
+    converter.convert(rgbHost, rgbHost2);
+
+    EXPECT_EQ(rgbHost2[0], 1);
+    std::cout << "[cuda] Resolution done for " << width / SCALE_2 << "x" << height / SCALE_2 << "." << std::endl;
+
+    delete[] rgbHost;
+    delete[] rgbHost2;
 }
 
 TEST(CUDA, H_MEM)
@@ -90,4 +114,26 @@ TEST(CUDA, BAYER_YUYV)
 
     delete[] bayerHost;
     delete[] yuyvHost;
+}
+
+TEST(CUDA, BAYER_RGB_REVERSEX)
+{
+    int width  = 3072;
+    int height = 2048;
+
+    unsigned char* bayerHost = new unsigned char[width * height];
+    unsigned char* rgbHost   = new unsigned char[width * height * 3];
+
+    for(int i = 0; i < width * height; ++i)
+    {
+        bayerHost[i] = static_cast<unsigned char>(rand() % 256);
+    }
+    
+    CudaImageConverter converter(width, height, 1, BAYER2RGB);  // ReverseX = true
+    converter.convert(bayerHost, rgbHost, true);
+
+    std::cout << "[cuda] ReverseX Conversion done. Output RGB size = " << width * height * 3 << " bytes." << std::endl;
+
+    delete[] bayerHost;
+    delete[] rgbHost;
 }
