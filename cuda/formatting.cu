@@ -21,8 +21,8 @@
 
 __device__ inline float getBayerVal(const unsigned char *bayer, int x, int y, int width, int height)
 {
-    if (x < 0 || x >= width || y < 0 || y >= height)
-        return 0.0f;
+    x = max(0, min(x, width - 1));
+    y = max(0, min(y, height - 1));
     return static_cast<float>(bayer[y * width + x]);
 }
 
@@ -120,7 +120,7 @@ __global__ void rgb2yuyv_kernel(const unsigned char *rgb, unsigned char *yuyv, u
     int x = (blockIdx.x * blockDim.x + threadIdx.x) * 2;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (x < width && y < height)
+    if (x + 1 < width && y < height)
     {
         int index_rgb = (y * width + x) * 3;
         int index_yuyv = (y * width + x) * 2;
