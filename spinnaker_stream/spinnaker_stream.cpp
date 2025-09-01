@@ -284,7 +284,6 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     // Define the converter pointer
     std::unique_ptr<CudaImageConverter> converter_bayer2rgb;
     std::unique_ptr<CudaImageConverter> converter_rgb2yuyv;
-    std::unique_ptr<CudaImageConverter> converter_bayer2rgb_2;
     std::unique_ptr<PIDGammaController> gamma_controller;
     std::unique_ptr<CudaResolution> converter_resolution;
 
@@ -302,11 +301,13 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
     }
 
     // Vehicle direction
-    int vehicle_direction = FORWARD;
+    int vehicle_direction = FORWARD + 1;
+    bool isReverseX = false;
 
     while (!signal)
     {
         pImage = vehicle_direction == FORWARD ? camera->GetNextImage() : camera_2->GetNextImage();
+        isReverseX = vehicle_direction != FORWARD;
 
         if (pImage->IsIncomplete())
         {
@@ -386,11 +387,11 @@ void capture_frames(const char *video_device, const std::string &ip, const int p
         {
             image_buffer->update(bayer);
             unsigned char *delayed_bayer = image_buffer->get_oldest();
-            converter_bayer2rgb->convert(delayed_bayer, rgb);
+            converter_bayer2rgb->convert(delayed_bayer, rgb, isReverseX);
         }
         else
         {
-            converter_bayer2rgb->convert(bayer, rgb);
+            converter_bayer2rgb->convert(bayer, rgb, isReverseX);
         }
 
         // Add components to the image

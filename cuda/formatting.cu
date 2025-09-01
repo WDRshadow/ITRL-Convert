@@ -35,7 +35,7 @@ __device__ inline unsigned char clampToByte(float val)
     return static_cast<unsigned char>(val + 0.5f);
 }
 
-__global__ void bayer2rgb_kernel(const unsigned char *bayer, unsigned char *rgb, unsigned int width, unsigned int height)
+__global__ void bayer2rgb_kernel(const unsigned char *bayer, unsigned char *rgb, unsigned int width, unsigned int height, bool isReverseX)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -49,65 +49,136 @@ __global__ void bayer2rgb_kernel(const unsigned char *bayer, unsigned char *rgb,
 
     float R = 0.0f, G = 0.0f, B = 0.0f;
 
-    if (rowEven && colEven)
+    // Adjust Bayer pattern based on ReverseX status
+    // Original RG pattern: R G / G B
+    // After ReverseX: G R / B G (becomes GR pattern)
+    if (!isReverseX)
     {
-        // R
-        R = getBayerVal(bayer, x, y, width, height);
-        // G
-        float g_left = getBayerVal(bayer, x - 1, y, width, height);
-        float g_right = getBayerVal(bayer, x + 1, y, width, height);
-        float g_up = getBayerVal(bayer, x, y - 1, width, height);
-        float g_down = getBayerVal(bayer, x, y + 1, width, height);
-        G = (g_left + g_right + g_up + g_down) * 0.25f;
-        // B
-        float b_ul = getBayerVal(bayer, x - 1, y - 1, width, height);
-        float b_ur = getBayerVal(bayer, x + 1, y - 1, width, height);
-        float b_dl = getBayerVal(bayer, x - 1, y + 1, width, height);
-        float b_dr = getBayerVal(bayer, x + 1, y + 1, width, height);
-        B = (b_ul + b_ur + b_dl + b_dr) * 0.25f;
-    }
-    else if (rowEven && !colEven)
-    {
-        // G
-        G = getBayerVal(bayer, x, y, width, height);
-        // R
-        float r_left = getBayerVal(bayer, x - 1, y, width, height);
-        float r_right = getBayerVal(bayer, x + 1, y, width, height);
-        R = 0.5f * (r_left + r_right);
-        // B
-        float b_up = getBayerVal(bayer, x, y - 1, width, height);
-        float b_down = getBayerVal(bayer, x, y + 1, width, height);
-        B = 0.5f * (b_up + b_down);
-    }
-    else if (!rowEven && colEven)
-    {
-        // G
-        G = getBayerVal(bayer, x, y, width, height);
-        // B
-        float b_left = getBayerVal(bayer, x - 1, y, width, height);
-        float b_right = getBayerVal(bayer, x + 1, y, width, height);
-        B = 0.5f * (b_left + b_right);
-        // R
-        float r_up = getBayerVal(bayer, x, y - 1, width, height);
-        float r_down = getBayerVal(bayer, x, y + 1, width, height);
-        R = 0.5f * (r_up + r_down);
+        // Original Bayer RG pattern
+        if (rowEven && colEven)
+        {
+            // R position
+            R = getBayerVal(bayer, x, y, width, height);
+            // G interpolation
+            float g_left = getBayerVal(bayer, x - 1, y, width, height);
+            float g_right = getBayerVal(bayer, x + 1, y, width, height);
+            float g_up = getBayerVal(bayer, x, y - 1, width, height);
+            float g_down = getBayerVal(bayer, x, y + 1, width, height);
+            G = (g_left + g_right + g_up + g_down) * 0.25f;
+            // B interpolation
+            float b_ul = getBayerVal(bayer, x - 1, y - 1, width, height);
+            float b_ur = getBayerVal(bayer, x + 1, y - 1, width, height);
+            float b_dl = getBayerVal(bayer, x - 1, y + 1, width, height);
+            float b_dr = getBayerVal(bayer, x + 1, y + 1, width, height);
+            B = (b_ul + b_ur + b_dl + b_dr) * 0.25f;
+        }
+        else if (rowEven && !colEven)
+        {
+            // G position
+            G = getBayerVal(bayer, x, y, width, height);
+            // R interpolation
+            float r_left = getBayerVal(bayer, x - 1, y, width, height);
+            float r_right = getBayerVal(bayer, x + 1, y, width, height);
+            R = 0.5f * (r_left + r_right);
+            // B interpolation
+            float b_up = getBayerVal(bayer, x, y - 1, width, height);
+            float b_down = getBayerVal(bayer, x, y + 1, width, height);
+            B = 0.5f * (b_up + b_down);
+        }
+        else if (!rowEven && colEven)
+        {
+            // G position
+            G = getBayerVal(bayer, x, y, width, height);
+            // B interpolation
+            float b_left = getBayerVal(bayer, x - 1, y, width, height);
+            float b_right = getBayerVal(bayer, x + 1, y, width, height);
+            B = 0.5f * (b_left + b_right);
+            // R interpolation
+            float r_up = getBayerVal(bayer, x, y - 1, width, height);
+            float r_down = getBayerVal(bayer, x, y + 1, width, height);
+            R = 0.5f * (r_up + r_down);
+        }
+        else
+        {
+            // B position
+            B = getBayerVal(bayer, x, y, width, height);
+            // G interpolation
+            float g_left = getBayerVal(bayer, x - 1, y, width, height);
+            float g_right = getBayerVal(bayer, x + 1, y, width, height);
+            float g_up = getBayerVal(bayer, x, y - 1, width, height);
+            float g_down = getBayerVal(bayer, x, y + 1, width, height);
+            G = (g_left + g_right + g_up + g_down) * 0.25f;
+            // R interpolation
+            float r_ul = getBayerVal(bayer, x - 1, y - 1, width, height);
+            float r_ur = getBayerVal(bayer, x + 1, y - 1, width, height);
+            float r_dl = getBayerVal(bayer, x - 1, y + 1, width, height);
+            float r_dr = getBayerVal(bayer, x + 1, y + 1, width, height);
+            R = (r_ul + r_ur + r_dl + r_dr) * 0.25f;
+        }
     }
     else
     {
-        // B
-        B = getBayerVal(bayer, x, y, width, height);
-        // G
-        float g_left = getBayerVal(bayer, x - 1, y, width, height);
-        float g_right = getBayerVal(bayer, x + 1, y, width, height);
-        float g_up = getBayerVal(bayer, x, y - 1, width, height);
-        float g_down = getBayerVal(bayer, x, y + 1, width, height);
-        G = (g_left + g_right + g_up + g_down) * 0.25f;
-        // R
-        float r_ul = getBayerVal(bayer, x - 1, y - 1, width, height);
-        float r_ur = getBayerVal(bayer, x + 1, y - 1, width, height);
-        float r_dl = getBayerVal(bayer, x - 1, y + 1, width, height);
-        float r_dr = getBayerVal(bayer, x + 1, y + 1, width, height);
-        R = (r_ul + r_ur + r_dl + r_dr) * 0.25f;
+        // ReverseX Bayer GR pattern (RG flipped horizontally becomes GR)
+        if (rowEven && colEven)
+        {
+            // G position (was R in original RG, now G after ReverseX)
+            G = getBayerVal(bayer, x, y, width, height);
+            // R interpolation
+            float r_left = getBayerVal(bayer, x - 1, y, width, height);
+            float r_right = getBayerVal(bayer, x + 1, y, width, height);
+            R = 0.5f * (r_left + r_right);
+            // B interpolation
+            float b_up = getBayerVal(bayer, x, y - 1, width, height);
+            float b_down = getBayerVal(bayer, x, y + 1, width, height);
+            B = 0.5f * (b_up + b_down);
+        }
+        else if (rowEven && !colEven)
+        {
+            // R position (was G in original RG, now R after ReverseX)
+            R = getBayerVal(bayer, x, y, width, height);
+            // G interpolation
+            float g_left = getBayerVal(bayer, x - 1, y, width, height);
+            float g_right = getBayerVal(bayer, x + 1, y, width, height);
+            float g_up = getBayerVal(bayer, x, y - 1, width, height);
+            float g_down = getBayerVal(bayer, x, y + 1, width, height);
+            G = (g_left + g_right + g_up + g_down) * 0.25f;
+            // B interpolation
+            float b_ul = getBayerVal(bayer, x - 1, y - 1, width, height);
+            float b_ur = getBayerVal(bayer, x + 1, y - 1, width, height);
+            float b_dl = getBayerVal(bayer, x - 1, y + 1, width, height);
+            float b_dr = getBayerVal(bayer, x + 1, y + 1, width, height);
+            B = (b_ul + b_ur + b_dl + b_dr) * 0.25f;
+        }
+        else if (!rowEven && colEven)
+        {
+            // B position (was G in original RG, now B after ReverseX)
+            B = getBayerVal(bayer, x, y, width, height);
+            // G interpolation
+            float g_left = getBayerVal(bayer, x - 1, y, width, height);
+            float g_right = getBayerVal(bayer, x + 1, y, width, height);
+            float g_up = getBayerVal(bayer, x, y - 1, width, height);
+            float g_down = getBayerVal(bayer, x, y + 1, width, height);
+            G = (g_left + g_right + g_up + g_down) * 0.25f;
+            // R interpolation
+            float r_ul = getBayerVal(bayer, x - 1, y - 1, width, height);
+            float r_ur = getBayerVal(bayer, x + 1, y - 1, width, height);
+            float r_dl = getBayerVal(bayer, x - 1, y + 1, width, height);
+            float r_dr = getBayerVal(bayer, x + 1, y + 1, width, height);
+            R = (r_ul + r_ur + r_dl + r_dr) * 0.25f;
+        }
+        else
+        {
+            // G position (was B in original RG, now G after ReverseX)
+            G = getBayerVal(bayer, x, y, width, height);
+            // B interpolation
+            float b_left = getBayerVal(bayer, x - 1, y, width, height);
+            float b_right = getBayerVal(bayer, x + 1, y, width, height);
+            B = 0.5f * (b_left + b_right);
+            // R interpolation
+            float r_up = getBayerVal(bayer, x, y - 1, width, height);
+            float r_down = getBayerVal(bayer, x, y + 1, width, height);
+            R = 0.5f * (r_up + r_down);
+        }
     }
 
     rgb[out_idx + 0] = clampToByte(R);
@@ -160,7 +231,7 @@ void free_cuda_buffer(unsigned char *h_pinned)
 }
 
 CudaImageConverter::CudaImageConverter(unsigned int width, unsigned int height, int stream_num, int mode)
-    : width(width), height(height), stream_num(stream_num), mode(mode),
+    : width(width), height(height), stream_num(stream_num), mode(mode), isReverseX(isReverseX),
       block_height(height / stream_num),
       size_bayer_block(width * block_height),
       size_rgb_block(width * block_height * 3),
@@ -206,7 +277,7 @@ CudaImageConverter::~CudaImageConverter()
     cudaFree(d_rgb);
 }
 
-void CudaImageConverter::convert(const unsigned char *src, unsigned char *dst)
+void CudaImageConverter::convert(const unsigned char *src, unsigned char *dst, bool isReverseX)
 {
     for (int i = 0; i < stream_num; i++)
     {
@@ -223,9 +294,11 @@ void CudaImageConverter::convert(const unsigned char *src, unsigned char *dst)
                 d_bayer + i * size_bayer_block,
                 d_rgb + i * size_rgb_block,
                 width,
-                block_height);
+                block_height,
+                isReverseX);
 
-            if (mode == BAYER2RGB) {
+            if (mode == BAYER2RGB)
+            {
                 cudaMemcpyAsync(
                     dst + i * size_rgb_block,
                     d_rgb + i * size_rgb_block,
@@ -243,14 +316,14 @@ void CudaImageConverter::convert(const unsigned char *src, unsigned char *dst)
                 cudaMemcpyHostToDevice,
                 streams[i]);
         }
-        if (mode == RGB2YUYV || mode == BAYER2YUYV) 
+        if (mode == RGB2YUYV || mode == BAYER2YUYV)
         {
             rgb2yuyv_kernel<<<*gridSize_2, *blockSize, 0, streams[i]>>>(
                 d_rgb + i * size_rgb_block,
                 d_yuyv + i * size_yuyv_block,
                 width,
                 block_height);
-    
+
             cudaMemcpyAsync(
                 dst + i * size_yuyv_block,
                 d_yuyv + i * size_yuyv_block,

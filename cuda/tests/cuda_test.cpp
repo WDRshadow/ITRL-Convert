@@ -115,3 +115,25 @@ TEST(CUDA, BAYER_YUYV)
     delete[] bayerHost;
     delete[] yuyvHost;
 }
+
+TEST(CUDA, BAYER_RGB_REVERSEX)
+{
+    int width  = 3072;
+    int height = 2048;
+
+    unsigned char* bayerHost = new unsigned char[width * height];
+    unsigned char* rgbHost   = new unsigned char[width * height * 3];
+
+    for(int i = 0; i < width * height; ++i)
+    {
+        bayerHost[i] = static_cast<unsigned char>(rand() % 256);
+    }
+    
+    CudaImageConverter converter(width, height, 1, BAYER2RGB);  // ReverseX = true
+    converter.convert(bayerHost, rgbHost, true);
+
+    std::cout << "[cuda] ReverseX Conversion done. Output RGB size = " << width * height * 3 << " bytes." << std::endl;
+
+    delete[] bayerHost;
+    delete[] rgbHost;
+}
