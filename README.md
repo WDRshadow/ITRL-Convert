@@ -141,6 +141,11 @@ ffplay /dev/video16
 run/build
 ```
 
+### Initialize the v4l2 package
+```bash
+run/init_v4l2
+```
+
 ### Run the stream with FleetMQ
 ```bash
 run/streamming start [-delay <time_ms>] [-hmi] [-p_hmi]
