@@ -6,7 +6,7 @@ set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_ARCHITECTURES 72)
 
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -20,7 +20,6 @@ add_subdirectory(spinnaker_stream)
 add_subdirectory(camera)
 add_subdirectory(cuda)
 add_subdirectory(sensor)
-add_subdirectory(demo)
 add_subdirectory(motion)
 
 add_executable(flir_stream main.cpp)

@@ -31,8 +31,8 @@ fi
 cd "$BUILD_DIR"
 
 # 2. Run CMake configuration
-echo -e "${YELLOW}[CMAKE]${NC} Configuring CMake project..."
-if cmake ..; then
+echo -e "${YELLOW}[CMAKE]${NC} Configuring CMake project in Release mode..."
+if cmake -DCMAKE_BUILD_TYPE=Release ..; then
     echo -e "${GREEN}[SUCCESS]${NC} CMake configuration successful"
 else
     echo -e "${RED}[ERROR]${NC} CMake configuration failed"

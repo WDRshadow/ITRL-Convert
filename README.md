@@ -4,6 +4,111 @@
 
 This project is designed to stream video from a FLIR camera to a virtual video device using v4l2loopback. It supports high frame rates (up to 60 FPS) and can overlay additional information such as sensor data and HMI elements onto the video stream. The project is optimized for performance using CUDA for image processing tasks.
 
+## Software architecture
+
+This FLIR camera streaming application follows a modular architecture designed for high-performance real-time video processing and sensor data integration. The system is composed of several key modules:
+
+### Workflow Overview
+
+```
+┌───────────────┐
+│   Camera Img  │◄─────────────────────────────────────────────────┐
+└───────────────┘                                                  │
+        │                                                          |
+        ▼                                                          |
+┌───────────────┐       ┌───────────────┐       ┌───────────────┐  |
+│ BayerRG → RGB │──────→│  CYRA motion  │──────→│  KBM motion   │  |
+└───────────────┘       └───────────────┘       └───────────────┘  |
+                                                        │          |
+                                                        ▼          |
+┌───────────────┐       ┌───────────────┐       ┌───────────────┐  |
+│  Merge Image  │◄──────│ Fisheye Dist. │◄──────│   Homography  │  |
+└───────────────┘       └───────────────┘       └───────────────┘  |
+        │                                                          |
+        ▼                                                          |
+┌───────────────┐       ┌───────────────┐       ┌───────────────┐  |
+│   RGB → YUYV  │──────→│ Write to v4l2 │──────→│  Release Img  │──┘ 
+└───────────────┘       └───────────────┘       └───────────────┘
+```
+
+### Module Descriptions
+
+#### 1. **Main Entry Point** (`main.cpp`)
+- Command-line argument parsing and configuration
+- Signal handling for graceful shutdown
+- Orchestrates initialization of all subsystems
+- Supports multiple operation modes: streaming, calibration, and testing
+
+#### 2. **Spinnaker Stream Module** (`spinnaker_stream/`)
+- **Purpose**: Core video capture and streaming functionality
+- **Key Components**:
+  - FLIR camera initialization and control using Spinnaker SDK
+  - Real-time frame capture with configurable FPS (up to 60)
+  - Integration with V4L2 loopback device for video output
+  - Multi-threaded sensor data reception and processing
+
+#### 3. **CUDA Module** (`cuda/`)
+- **Purpose**: High-performance GPU-accelerated image processing
+- **Key Components**:
+  - `CudaImageConverter`: Handles Bayer to RGB and RGB to YUYV format conversion
+  - `CudaResolution`: Manages image scaling and resolution adjustments
+  - Kernel implementations for parallel processing on GPU
+  - Optimized for NVIDIA Jetson AGX Xavier (Compute Capability 7.2)
+
+#### 4. **Camera Module** (`camera/`)
+- **Purpose**: Image processing, calibration, and visual component rendering
+- **Key Components**:
+  - `Fisheye`: Fisheye camera calibration and undistortion
+  - `Homography`: Perspective transformation for top-down view
+  - `Component System`: Modular visual overlay system
+    - `StreamImage`: Container for multiple visual components
+    - `LineComponent`: Renders driving lines and predictions
+    - `TextComponent`: Displays text information
+    - `ImageComponent`: Handles image overlays
+  - `RingBuffer`: Efficient circular buffer for image data
+  - `PIDGammaController`: Automatic exposure and gamma correction
+
+#### 5. **Sensor Module** (`sensor/`)
+- **Purpose**: Real-time sensor data collection and network communication
+- **Key Components**:
+  - `SocketBridge`: UDP socket communication for sensor data
+  - `SensorAPI`: Unified interface for accessing sensor values
+  - `DataLogger`: CSV logging of sensor data with timestamps
+  - Multi-port listening (base port, base+1, base+2) for different data streams
+
+#### 6. **Motion Module** (`motion/`)
+- **Purpose**: Vehicle motion prediction and kinematic modeling
+- **Key Components**:
+  - `CYRA Model`: Constant Yaw Rate and Acceleration prediction model
+  - `Bicycle Model`: Vehicle dynamics for steering prediction
+  - State prediction for autonomous vehicle path planning
+
+### Data Flow
+
+1. **Image Acquisition**: FLIR camera captures raw Bayer format images via Spinnaker SDK
+2. **GPU Processing**: CUDA kernels convert Bayer → RGB → YUYV with hardware acceleration
+3. **Component Rendering**: Visual overlays (driving lines, text, HMI elements) are rendered onto the image
+4. **Sensor Integration**: Real-time sensor data is received via UDP and integrated into visual components
+5. **Output Streaming**: Processed frames are written to V4L2 loopback device for consumption by external applications
+
+### Performance Optimization
+
+- **Multi-threading**: Separate threads for camera capture, sensor data reception, and processing
+- **CUDA Acceleration**: GPU-based image format conversion achieving ~8ms processing time
+- **Memory Management**: Pinned CUDA memory for efficient CPU-GPU data transfer
+- **Circular Buffers**: Lock-free ring buffers for high-throughput data handling
+
+### Configuration & Calibration
+
+The system supports runtime calibration for:
+- **Fisheye Distortion**: Automatic calibration using chessboard patterns
+- **Homography Transformation**: Perspective correction for bird's-eye view
+- **Sensor Mapping**: Configurable sensor data sources and display parameters
+
+This modular architecture enables easy extension for new sensors, different camera types, and additional visual components while maintaining high performance for real-time applications.
+
+
+
 ## Dependency
 
 - OpenCV
@@ -40,7 +145,7 @@ run/build
 ```bash
 run/streamming start [-delay <time_ms>] [-hmi] [-p_hmi]
 ```
-For the parameters, please refer to `run/streamming -h`.
+For the parameters, please refer to `run/streamming -h`. You can check the log in `run/logs/`.
 
 Once the stream is started, you can view it FleetMQ Web app by navigating to `https://app.fleetmq.com` and logging in with your credentials. The stream will be available under the "Streams" section.
 
@@ -53,6 +158,7 @@ run/streamming restart [-delay <time_ms>] [-hmi] [-p_hmi]
 ```bash
 run/streamming stop
 ```
+The output data will be saved in `run/output/` directory.
 
 ## Parameters
 
