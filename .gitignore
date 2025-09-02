@@ -1,2 +1,6 @@
 .vscode/
 build/
+flir_stream
+logs/
+pids/
+output/

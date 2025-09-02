@@ -23,16 +23,16 @@ add_subdirectory(sensor)
 add_subdirectory(demo)
 add_subdirectory(motion)
 
-add_executable(rcve_stream main.cpp)
+add_executable(flir_stream main.cpp)
 
-target_link_directories(rcve_stream
+target_link_directories(flir_stream
         PUBLIC
         /opt/spinnaker/lib
 )   
 
-target_include_directories(rcve_stream
+target_include_directories(flir_stream
         PUBLIC
         ${OpenCV_INCLUDE_DIRS}
 )
 
-target_link_libraries(rcve_stream ${OpenCV_LIBS} spinnaker_stream sensor cuda camera Spinnaker motion)
+target_link_libraries(flir_stream ${OpenCV_LIBS} spinnaker_stream sensor cuda camera Spinnaker motion)

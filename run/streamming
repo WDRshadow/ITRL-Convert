@@ -1,0 +1,246 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Change working directory to run/ folder
+# This script is expected to be executed from the workspace root as: run/streamming
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# ===================== Configuration: Modify as needed =====================
+# List of startup commands
+CMDS=(
+  "python3 ./hmi_bridge.py"
+  "./flir_stream -s -log output/output"
+  "./datastreamer-beta -eap=true -id=rcve -configId=rcveteleopconfig -groupId=fmq_f1a7e3a0d78b8aa610662fb8344098a1731c19ce721661a90013948813e782ab -metricsToSDK=2"
+  "python3 ./rcve_bridge.py"
+)
+
+USE_HMI=(0 1 0 0)
+USE_P_HMI=(0 1 0 0)
+USE_DELAY=(1 1 0 0)
+
+PID_DIR="./pids"
+LOG_DIR="./logs"
+OUTPUT_DIR="./output"
+INT_WAIT=3     # Wait time in seconds after sending SIGINT
+TERM_WAIT=3    # Wait time in seconds after sending SIGTERM
+START_WAIT=3   # Interval in seconds between starting each process
+# ========================================================
+
+mkdir -p "$PID_DIR" "$LOG_DIR" "$OUTPUT_DIR"
+
+# Send signal with timeout wait
+_send_signal_with_timeout() {
+  local target="$1"
+  local sig="$2"
+  local wait_s="$3"
+  local name="$4"
+
+  if kill -0 "$target" 2>/dev/null; then
+    echo "  -> Sending $sig to $name (target $target)"
+    kill "-$sig" "$target" 2>/dev/null || true
+  fi
+
+  local t_end=$((SECONDS + wait_s))
+  while kill -0 "$target" 2>/dev/null; do
+    (( SECONDS >= t_end )) && break
+    sleep 0.2
+  done
+}
+
+# Check if there are any running processes
+_check_running_processes() {
+  local running_count=0
+  local running_procs=()
+  
+  for i in "${!CMDS[@]}"; do
+    local pid_file="$PID_DIR/proc_$i.pid"
+    
+    if [[ -f "$pid_file" ]]; then
+      local pid pgid
+      read -r pid pgid < "$pid_file" || true
+      local target="${pid:-0}"
+      if kill -0 "$target" 2>/dev/null; then
+        running_count=$((running_count + 1))
+        running_procs+=("  - ${CMDS[$i]} (PID $pid)")
+      fi
+    fi
+  done
+  
+  if (( running_count > 0 )); then
+    echo "Warning: There are $running_count processes currently running:"
+    printf '%s\n' "${running_procs[@]}"
+    echo ""
+    echo "Please stop them first or use 'restart' to restart all processes."
+    echo "  $0 stop         # stop all processes"
+    echo "  $0 restart      # restart all processes"
+    echo "  $0 restart -hmi -p_hmi -delay 150  # restart with options"
+    return 1
+  fi
+  
+  return 0
+}
+
+# Start; only supports -hmi, -p_hmi and -delay <num_ms>
+start() {
+  # Protection mechanism: check if any processes are running
+  if ! _check_running_processes; then
+    exit 1
+  fi
+  
+  # Initialize v4l2 devices before starting processes
+  echo "Initializing v4l2 devices..."
+  if [[ -x "./init_v4l2" ]]; then
+    ./init_v4l2
+    echo "Device initialization completed."
+  else
+    echo "Warning: init_v4l2 script not found or not executable"
+  fi
+  
+  local want_hmi=0
+  local want_p_hmi=0
+  local delay_val=""
+
+  # Parse only the three allowed parameters
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -hmi)
+        want_hmi=1; shift ;;
+      -p_hmi)
+        want_p_hmi=1; shift ;;
+      -delay)
+        if [[ "${2:-}" =~ ^[0-9]+$ ]]; then
+          delay_val="$2"; shift 2
+        else
+          echo "Error: -delay requires a millisecond integer, e.g.: -delay 150"
+          exit 1
+        fi
+        ;;
+      *)
+        echo "Error: Only supports -hmi, -p_hmi and -delay <num_ms>"
+        exit 1
+        ;;
+    esac
+  done
+
+  # Length consistency check
+  if [[ ${#CMDS[@]} -ne ${#USE_HMI[@]} || ${#CMDS[@]} -ne ${#USE_P_HMI[@]} || ${#CMDS[@]} -ne ${#USE_DELAY[@]} ]]; then
+    echo "Configuration error: CMDS / USE_HMI / USE_P_HMI / USE_DELAY must have the same length"
+    exit 1
+  fi
+
+  echo "Starting processes..."
+  for i in "${!CMDS[@]}"; do
+    local full_cmd="${CMDS[$i]}"
+
+    # Append -hmi / -p_hmi / -delay based on flags
+    if (( want_hmi == 1 )) && (( ${USE_HMI[$i]} == 1 )); then
+      full_cmd+=" -hmi"
+    fi
+    if (( want_p_hmi == 1 )) && (( ${USE_P_HMI[$i]} == 1 )); then
+      full_cmd+=" -p_hmi"
+    fi
+    if [[ -n "$delay_val" ]] && (( ${USE_DELAY[$i]} == 1 )); then
+      full_cmd+=" -delay $delay_val"
+    fi
+
+    echo "  -> $full_cmd"
+    # setsid makes it have an independent process group, convenient for sending signals to the group like Ctrl+C
+    setsid bash -lc "$full_cmd" >"$LOG_DIR/proc_$i.log" 2>&1 &
+    local pid=$!
+    local pgid
+    pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ' || echo "")
+    [[ -z "$pgid" ]] && pgid="$pid"
+    echo "$pid $pgid" > "$PID_DIR/proc_$i.pid"
+    
+    # Wait interval before starting the next process (except for the last one)
+    if (( i < ${#CMDS[@]} - 1 )); then
+      echo "  -> Waiting $START_WAIT seconds before starting next process..."
+      sleep "$START_WAIT"
+    fi
+  done
+}
+
+_stop_one_proc() {
+  local i="$1"
+  local cmd="${CMDS[$i]}"
+  local pid_file="$PID_DIR/proc_$i.pid"
+
+  if [[ ! -f "$pid_file" ]]; then
+    echo "  -> No pidfile for: $cmd (skip)"
+    return
+  fi
+
+  local pid pgid
+  read -r pid pgid < "$pid_file" || true
+  if [[ -z "${pid:-}" || -z "${pgid:-}" ]]; then
+    echo "  -> Bad pidfile for: $cmd"
+    rm -f "$pid_file"
+    return
+  fi
+
+  # Prefer sending signals to process group (negative PGID), closer to Ctrl+C behavior
+  local target="-$pgid"
+  if ! kill -0 "$target" 2>/dev/null; then
+    target="$pid"
+  fi
+
+  # 1) SIGINT (Ctrl+C)
+  _send_signal_with_timeout "$target" "SIGINT" "$INT_WAIT" "$cmd"
+
+  # Still alive -> 2) SIGTERM
+  if kill -0 "$target" 2>/dev/null; then
+    _send_signal_with_timeout "$target" "SIGTERM" "$TERM_WAIT" "$cmd"
+  fi
+
+  # Still alive -> 3) SIGKILL
+  if kill -0 "$target" 2>/dev/null; then
+    echo "  -> Forcing SIGKILL: $cmd"
+    kill -9 "$target" 2>/dev/null || true
+  fi
+
+  rm -f "$pid_file"
+}
+
+stop() {
+  echo "Stopping processes (SIGINT -> SIGTERM -> SIGKILL)..."
+  for i in "${!CMDS[@]}"; do
+    _stop_one_proc "$i"
+  done
+}
+
+status() {
+  echo "Checking status..."
+  for i in "${!CMDS[@]}"; do
+    local cmd="${CMDS[$i]}"
+    local pid_file="$PID_DIR/proc_$i.pid"
+
+    if [[ -f "$pid_file" ]]; then
+      local pid pgid
+      read -r pid pgid < "$pid_file" || true
+      local target="${pid:-0}"
+      if kill -0 "$target" 2>/dev/null; then
+        echo "  -> Running (PID $pid, PGID $pgid): $cmd"
+      else
+        echo "  -> Dead but pidfile exists: $cmd"
+      fi
+    else
+      echo "  -> Not running: $cmd"
+    fi
+  done
+}
+
+case "${1:-}" in
+  start)   shift; start "$@" ;;                    # Allows: -hmi / -p_hmi / -delay <num_ms>
+  stop)    stop ;;
+  restart) shift; stop; sleep 1; start "$@" ;;    # restart can also take -hmi / -p_hmi / -delay
+  status)  status ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|status} [ -hmi ] [ -p_hmi ] [ -delay <num_ms> ]"
+    echo "Example:"
+    echo "  $0 start -hmi -p_hmi -delay 150"
+    echo "  $0 restart -p_hmi -delay 120"
+    exit 1
+    ;;
+esac
+
