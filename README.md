@@ -123,6 +123,11 @@ This modular architecture enables easy extension for new sensors, different came
 run/build
 ```
 
+### Initialize the v4l2 package
+```bash
+run/init_v4l2
+```
+
 ### Run the video stream
 
 ```bash
@@ -139,11 +144,6 @@ ffplay /dev/video16
 ### Build the binary
 ```bash
 run/build
-```
-
-### Initialize the v4l2 package
-```bash
-run/init_v4l2
 ```
 
 ### Run the stream with FleetMQ
