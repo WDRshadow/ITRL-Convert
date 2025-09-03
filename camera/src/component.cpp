@@ -103,7 +103,7 @@ void PredictionLine::update(const float v, const float a, float str_whe_phi_remo
     const auto [x, y, theta] = predictCYRA(v, a, omega, THETA0, latency);
     Point2f origin = {
         static_cast<float>(ORIGIN_X + y * PIXELS_PER_METER),
-        static_cast<float>(ORIGIN_Y - x * PIXELS_PER_METER)
+        static_cast<float>(ORIGIN_Y - x * PIXELS_PER_METER - 100)
     };
     vector<Point2f> lines = create_line(origin, theta, PIXELS_PER_METER, 50);
     // KBM Model-----------------------------------------------------------------------------------
@@ -134,4 +134,24 @@ void TextComponent::update(const string& text)
 {
     reset_img();
     draw_text(text, width, height).copyTo(img);
+}
+
+ImageComponent_2::ImageComponent_2(const int x, const int y, const int width, const int height, const int origin_width,
+                                   const int origin_height)
+    : ImageComponent(x, y, width, height), origin_width(origin_width), origin_height(origin_height)
+{
+}
+
+void ImageComponent_2::update(const unsigned char *imageData)
+{
+    reset_img();
+    if (imageData)
+    {
+        Mat img_temp(origin_height, origin_width, CV_8UC3, const_cast<unsigned char *>(imageData));
+        resize(img_temp, img, Size(width, height), 0, 0, INTER_LINEAR);
+    }
+    else
+    {
+        std::cerr << "[ImageComponent_2] Error: imageData is null" << std::endl;
+    }
 }

@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.18)
 
 project(motion)
 
-enable_testing()
-
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(OpenCV REQUIRED)
@@ -20,8 +18,6 @@ add_library(motion
         src/cyra.cpp
         src/kbm.cpp
 )
-
-add_subdirectory(tests)
 
 set_target_properties(sensor PROPERTIES
         POSITION_INDEPENDENT_CODE ON
