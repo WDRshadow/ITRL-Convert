@@ -3,3 +3,4 @@ build/
 logs/
 pids/
 output/
+run/svea_stream

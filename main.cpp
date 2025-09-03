@@ -24,7 +24,7 @@ bool capture_signal = false;
 
 void run_zed_stream(const char *videoDevice, const char *ip, int port, int fps, int delay_ms, const char *logger, const bool is_hmi, const bool is_p_hmi, const int scale)
 {
-    std::cout << "[main] Starting to capture frames from the FLIR camera..." << std::endl;
+    std::cout << "[main] Starting to capture frames from the ZED camera..." << std::endl;
     capture_frames(videoDevice, ip, port, capture_signal, fps, delay_ms, logger, is_hmi, is_p_hmi, scale);
     std::cout << "[main] Capture process finished" << std::endl;
 }

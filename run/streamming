@@ -10,7 +10,7 @@ cd "$SCRIPT_DIR"
 # List of startup commands
 CMDS=(
   "python3 ./hmi_bridge.py"
-  "./flir_stream -s -log output/output"
+  "./svea_stream -s -log output/output"
   "./datastreamer-beta -eap=true -id=rcve -configId=rcveteleopconfig -groupId=fmq_f1a7e3a0d78b8aa610662fb8344098a1731c19ce721661a90013948813e782ab -metricsToSDK=2"
   "python3 ./svea_bridge.py"
 )
