@@ -1,0 +1,9 @@
+services:
+        datastreamer:
+                image: ghcr.io/fleetmq/datastreamer-beta-eap:ef8a060
+                command: '-eap=true -id=rcve -configId=sveateleopconfig -groupId=fmq_f1a7e3a0d78b8aa610662fb8344098a1731c19ce721661a90013948813e782ab'
+                privileged: true
+                restart: unless-stopped
+                network_mode: "host"
+                devices:
+                        - /dev/video16:/dev/video16
