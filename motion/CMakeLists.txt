@@ -19,6 +19,6 @@ add_library(motion
         src/kbm.cpp
 )
 
-set_target_properties(sensor PROPERTIES
+set_target_properties(motion PROPERTIES
         POSITION_INDEPENDENT_CODE ON
 )

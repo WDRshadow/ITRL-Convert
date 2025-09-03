@@ -280,7 +280,7 @@ void capture_frames(const char *video_device, const std::string &ip, int port, b
             }
             if (is_thread_running || is_thread_running_2 || is_thread_running_3)
             {
-                std::cerr << "[spinnaker stream] Sensor thread did not exit gracefully" << std::endl;
+                std::cerr << "[zed stream] Sensor thread did not exit gracefully" << std::endl;
                 sensor_thread.detach();
                 sensor_thread_2.detach();
                 sensor_thread_3.detach();

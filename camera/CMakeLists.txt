@@ -12,8 +12,6 @@ include_directories(
         ${CMAKE_SOURCE_DIR}/motion/include
 )
 
-link_libraries(${OpenCV_LIBS})
-
 add_library(camera
         STATIC
         src/ring_buffer.cpp
@@ -22,6 +20,12 @@ add_library(camera
         src/util.cpp
         src/component.cpp
         src/gamma.cpp
+)
+
+target_link_libraries(camera
+        PUBLIC
+        ${OpenCV_LIBS}
+        motion
 )
 
 set_target_properties(camera PROPERTIES

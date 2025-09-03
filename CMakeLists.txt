@@ -16,11 +16,11 @@ endif()
 
 find_package(OpenCV REQUIRED)
 
-add_subdirectory(zed_stream)
-add_subdirectory(camera)
 add_subdirectory(cuda)
-add_subdirectory(sensor)
 add_subdirectory(motion)
+add_subdirectory(camera)
+add_subdirectory(sensor)
+add_subdirectory(zed_stream)
 
 add_executable(svea_stream main.cpp)
 
@@ -30,4 +30,4 @@ target_include_directories(svea_stream
         ${CMAKE_SOURCE_DIR}/camera/include
 )
 
-target_link_libraries(svea_stream camera zed_stream cuda)
+target_link_libraries(svea_stream camera zed_stream cuda sensor motion)

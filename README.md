@@ -1,12 +1,12 @@
-# FLIR Camera Video Stream
+# ZED Camera Video Stream
 
 ## Introduction
 
-This project is designed to stream video from a FLIR camera to a virtual video device using v4l2loopback. It supports high frame rates (up to 60 FPS) and can overlay additional information such as sensor data and HMI elements onto the video stream. The project is optimized for performance using CUDA for image processing tasks.
+This project is designed to stream video from a ZED camera to a virtual video device using v4l2loopback. It supports high frame rates (up to 60 FPS) and can overlay additional information such as sensor data and HMI elements onto the video stream. The project is optimized for performance using CUDA for image processing tasks.
 
 ## Software architecture
 
-This FLIR camera streaming application follows a modular architecture designed for high-performance real-time video processing and sensor data integration. The system is composed of several key modules:
+This ZED camera streaming application follows a modular architecture designed for high-performance real-time video processing and sensor data integration. The system is composed of several key modules:
 
 ### Workflow Overview
 
@@ -17,12 +17,12 @@ This FLIR camera streaming application follows a modular architecture designed f
         │                                                          |
         ▼                                                          |
 ┌───────────────┐       ┌───────────────┐       ┌───────────────┐  |
-│ BayerRG → RGB │──────→│  CYRA motion  │──────→│  KBM motion   │  |
+│   BGRA → RGB  │──────→│  CYRA motion  │──────→│  KBM motion   │  |
 └───────────────┘       └───────────────┘       └───────────────┘  |
                                                         │          |
                                                         ▼          |
 ┌───────────────┐       ┌───────────────┐       ┌───────────────┐  |
-│  Merge Image  │◄──────│ Fisheye Dist. │◄──────│   Homography  │  |
+│  Merge Image  │◄──────│       -       │◄──────│   Homography  │  |
 └───────────────┘       └───────────────┘       └───────────────┘  |
         │                                                          |
         ▼                                                          |
@@ -39,21 +39,20 @@ This FLIR camera streaming application follows a modular architecture designed f
 - Orchestrates initialization of all subsystems
 - Supports multiple operation modes: streaming, calibration, and testing
 
-#### 2. **Spinnaker Stream Module** (`spinnaker_stream/`)
+#### 2. **Zed Stream Module** (`zed_stream/`)
 - **Purpose**: Core video capture and streaming functionality
 - **Key Components**:
-  - FLIR camera initialization and control using Spinnaker SDK
-  - Real-time frame capture with configurable FPS (up to 60)
+  - ZED camera initialization and control using ZED SDK
+  - Real-time frame capture with configurable FPS (up to 30)
   - Integration with V4L2 loopback device for video output
   - Multi-threaded sensor data reception and processing
 
 #### 3. **CUDA Module** (`cuda/`)
 - **Purpose**: High-performance GPU-accelerated image processing
 - **Key Components**:
-  - `CudaImageConverter`: Handles Bayer to RGB and RGB to YUYV format conversion
+  - `CudaImageConverter`: Handles BGRA to RGB and RGB to YUYV format conversion
   - `CudaResolution`: Manages image scaling and resolution adjustments
   - Kernel implementations for parallel processing on GPU
-  - Optimized for NVIDIA Jetson AGX Xavier (Compute Capability 7.2)
 
 #### 4. **Camera Module** (`camera/`)
 - **Purpose**: Image processing, calibration, and visual component rendering
@@ -85,7 +84,7 @@ This FLIR camera streaming application follows a modular architecture designed f
 
 ### Data Flow
 
-1. **Image Acquisition**: FLIR camera captures raw Bayer format images via Spinnaker SDK
+1. **Image Acquisition**: ZED camera captures raw Bayer format images via Spinnaker SDK
 2. **GPU Processing**: CUDA kernels convert Bayer → RGB → YUYV with hardware acceleration
 3. **Component Rendering**: Visual overlays (driving lines, text, HMI elements) are rendered onto the image
 4. **Sensor Integration**: Real-time sensor data is received via UDP and integrated into visual components
@@ -114,7 +113,7 @@ This modular architecture enables easy extension for new sensors, different came
 - OpenCV
 - v4l2loopback
 - CUDA
-- Spinnaker SDK
+- ZED SDK
 
 ## Usage
 
@@ -131,7 +130,7 @@ run/init_v4l2
 ### Run the video stream
 
 ```bash
-run/flir_stream
+run/svea_stream
 ```
 
 Now the stream is available on `/dev/video16`. If you want to view it, open a new terminal and run
@@ -210,12 +209,12 @@ The conversion is implemented using sequential processing, parallel processing, 
 ## Fisheye criteria
 
 1. Save your images in `run/data/*.jpg` which is taken by fisheye camera with a chessboard that has 10x7 vertices and each square size is 2.5cm in A4 paper.
-2. Run the executable file with parameter `./flir_stream -fc` in the `run` directory.
+2. Run the executable file with parameter `./svea_stream -fc` in the `run` directory.
 3. The program will output the matrix with distortion coefficients in `fisheye_calibration.yaml`.
 
 ## Fisheye undistortion
 
-1. Run the executable file with parameters `run/flir_stream -fu <image>` in the `run` directory with the image you want to undistort.
+1. Run the executable file with parameters `run/svea_stream -fu <image>` in the `run` directory with the image you want to undistort.
 2. The program will output the undistorted image in the same directory.
 
 ## Homography criteria
@@ -227,7 +226,7 @@ The conversion is implemented using sequential processing, parallel processing, 
     #Formet: [Left front wheel x/y, right front wheel x/y, left front 50m x/y, right front 50m x/y]
     points: [ 767., 2047., 2303., 2047., 1023., 1365., 2047., 1365. ]
     ```
-2. Run the executable file with parameter `./flir_stream -hc` in the `run` directory.
+2. Run the executable file with parameter `./svea_stream -hc` in the `run` directory.
 3. The program will output the homography matrix in `homography_calibration.yaml`.
 
 

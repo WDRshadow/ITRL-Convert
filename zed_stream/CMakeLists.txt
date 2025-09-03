@@ -40,4 +40,7 @@ target_link_libraries(zed_stream
         ${ZED_LIBRARIES}
         ${OpenCV_LIBS}
         ${CUDA_LIBRARIES}
+        camera
+        sensor
+        motion
 )
