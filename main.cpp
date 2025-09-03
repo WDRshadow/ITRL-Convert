@@ -16,7 +16,7 @@
 #define DEFAULT_VIDEO_DEVICE "/dev/video16"
 #define DEFAULT_IP "0.0.0.0"
 #define DEFAULT_PORT 10086
-#define DEFAULT_FPS 60
+#define DEFAULT_FPS 30
 #define DEFAULT_DELAY_MS 0
 #define DEFAULT_SCALE 1
 

@@ -128,7 +128,7 @@ void capture_frames(const char *video_device, const std::string &ip, int port, b
             delete bridge_3;
             bridge_3 = nullptr;
         }
-        std::cout << "[spinnaker stream] Sensor data not available." << std::endl;
+        std::cout << "[zed stream] Sensor data not available." << std::endl;
     }
 
     // Define the converter pointer
