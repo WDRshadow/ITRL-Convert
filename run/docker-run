@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+docker run --runtime nvidia -it --rm \
+    --network=host \
+    --device /dev/video16:/dev/video16 \
+    --device /dev/video0:/dev/video0 \
+    --privileged \
+    itrl-convert "$@"

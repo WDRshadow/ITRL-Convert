@@ -122,6 +122,11 @@ This modular architecture enables easy extension for new sensors, different came
 run/build
 ```
 
+or use the docker image
+```bash
+run/docker-build
+```
+
 ### Initialize the v4l2 package
 ```bash
 run/init_v4l2
@@ -130,7 +135,12 @@ run/init_v4l2
 ### Run the video stream
 
 ```bash
-run/svea_stream
+run/svea_stream <args>
+```
+
+or use the docker image
+```bash
+run/docker-run <args>
 ```
 
 Now the stream is available on `/dev/video16`. If you want to view it, open a new terminal and run
