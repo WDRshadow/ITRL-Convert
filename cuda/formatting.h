@@ -3,6 +3,9 @@
 
 #include <cstddef>
 
+#define D_BGRA2RGB 0
+#define RGB2YUYV 1
+
 /**
  * Use cudaHostAlloc to allocate a pinned memory buffer.
  *
@@ -20,7 +23,8 @@ typedef struct CUstream_st *cudaStream_t;
 typedef struct dim3 dim3;
 typedef long unsigned int size_t;
 
-class CudaImageConverter {
+class CudaImageConverter
+{
 protected:
     const unsigned int width;
     const unsigned int height;
@@ -28,8 +32,11 @@ protected:
 
     const unsigned int block_height;
     const size_t size_bgra_block;
+    const size_t size_rgb_block;
     const size_t size_yuyv_block;
     unsigned char *d_yuyv = nullptr;
+    unsigned char *d_rgb = nullptr;
+    const int mode;
 
     cudaStream_t *streams = nullptr;
     dim3 *blockSize;
@@ -43,15 +50,15 @@ public:
      * @param height Height of the image
      * @param stream_num Number of CUDA streams
      */
-    CudaImageConverter(unsigned int width, unsigned int height, int stream_num);
+    CudaImageConverter(unsigned int width, unsigned int height, int stream_num, int mode);
     ~CudaImageConverter();
-    CudaImageConverter(const CudaImageConverter&) = delete;
-    CudaImageConverter& operator=(const CudaImageConverter&) = delete;
-    CudaImageConverter(CudaImageConverter&&) = delete;
-    CudaImageConverter& operator=(CudaImageConverter&&) = delete;
+    CudaImageConverter(const CudaImageConverter &) = delete;
+    CudaImageConverter &operator=(const CudaImageConverter &) = delete;
+    CudaImageConverter(CudaImageConverter &&) = delete;
+    CudaImageConverter &operator=(CudaImageConverter &&) = delete;
 
     /**
-     * Convert pixel format with CUDA. 
+     * Convert pixel format with CUDA.
      *
      * @param src Input data
      * @param dst Output data

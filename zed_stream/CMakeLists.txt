@@ -29,7 +29,10 @@ add_library(zed_stream
 target_include_directories(zed_stream
         PUBLIC
         .
+        ${OpenCV_INCLUDE_DIRS}
+        ${CMAKE_SOURCE_DIR}/sensor/include
         ${CMAKE_SOURCE_DIR}/cuda
+        ${CMAKE_SOURCE_DIR}/camera/include
 )
 
 target_link_libraries(zed_stream
