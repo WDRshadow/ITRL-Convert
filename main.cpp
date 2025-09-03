@@ -48,7 +48,7 @@ void run_fu(const std::string &filename)
 
 void run_hc()
 {
-    const vector<Point2f> src{{1510, 2047}, {1560, 2047}, {1510, 797}, {1560, 797}};
+    const vector<Point2f> src{{949, 1079}, {969, 1079}, {949, 579}, {969, 579}};
     vector<Point2f> dst;
     FileStorage fs("homography_points.yaml", FileStorage::READ);
     fs["points"] >> dst;

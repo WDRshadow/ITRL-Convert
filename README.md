@@ -224,7 +224,7 @@ The conversion is implemented using sequential processing, parallel processing, 
     %YAML:1.0
     ---
     #Formet: [Left front wheel x/y, right front wheel x/y, left front 50m x/y, right front 50m x/y]
-    points: [ 767., 2047., 2303., 2047., 1023., 1365., 2047., 1365. ]
+    points: [ 479., 1079., 1440., 1079., 639., 720., 1280., 720. ]
     ```
 2. Run the executable file with parameter `./svea_stream -hc` in the `run` directory.
 3. The program will output the homography matrix in `homography_calibration.yaml`.

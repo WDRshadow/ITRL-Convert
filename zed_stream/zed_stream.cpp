@@ -210,11 +210,11 @@ void capture_frames(const char *video_device, const std::string &ip, int port, b
                     stream_image = std::make_unique<StreamImage>(width, height);
                     prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
                                                                        "homography_calibration.yaml", width, height);
-                    velocity = make_shared<TextComponent>(1536, 1462, 200, 200);
-                    latency_label = make_shared<TextComponent>(2800, 100, 500, 200);
-                    // stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
+                    velocity = make_shared<TextComponent>(960, 770, 100, 100);
+                    latency_label = make_shared<TextComponent>(1800, 50, 200, 100);
+                    stream_image->add_component("prediction_line", std::static_pointer_cast<Component>(prediction_line));
                     stream_image->add_component("velocity", std::static_pointer_cast<Component>(velocity));
-                    // stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
+                    stream_image->add_component("latency_label", std::static_pointer_cast<Component>(latency_label));
                 }
                 if (logger)
                 {
@@ -248,7 +248,7 @@ void capture_frames(const char *video_device, const std::string &ip, int port, b
                     prediction_line->update(_vel, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), 0);
                 }
                 velocity->update(to_string(static_cast<int>(_vel)));
-                // latency_label->update(std::to_string(total_delay) + " ms");
+                latency_label->update(std::to_string(total_delay) + " ms");
                 *stream_image >> rgb;
             }
             if (logger)

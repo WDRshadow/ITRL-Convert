@@ -6,7 +6,7 @@
 #include <opencv2/opencv.hpp>
 
 #define VEHICLE_L 2.6
-#define KBM_S 25
+#define KBM_S 50
 #define KBM_N 300
 
 std::vector<cv::Point2f> kbm(

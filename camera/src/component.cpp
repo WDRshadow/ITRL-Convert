@@ -66,7 +66,7 @@ void LineComponent::operator>>(Mat& imageData) const
 void LineComponent::project(const vector<Point2f>& lines)
 {
     homography_line.projectPoints(lines, lines_);
-    fisheye_camera.distortPoints(lines_, lines_);
+    // fisheye_camera.distortPoints(lines_, lines_);
 }
 
 DriverLine::DriverLine(const string& fisheye_config, const string& homography_config, const int width,
@@ -103,7 +103,7 @@ void PredictionLine::update(const float v, const float a, float str_whe_phi_remo
     const auto [x, y, theta] = predictCYRA(v, a, omega, THETA0, latency);
     Point2f origin = {
         static_cast<float>(ORIGIN_X + y * PIXELS_PER_METER),
-        static_cast<float>(ORIGIN_Y - x * PIXELS_PER_METER - 100)
+        static_cast<float>(ORIGIN_Y - x * PIXELS_PER_METER)
     };
     vector<Point2f> lines = create_line(origin, theta, PIXELS_PER_METER, 50);
     // KBM Model-----------------------------------------------------------------------------------

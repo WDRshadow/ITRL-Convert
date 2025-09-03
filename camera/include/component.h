@@ -7,9 +7,9 @@
 #include "fisheye.h"
 #include "homography.h"
 
-#define ORIGIN_X 1536
-#define ORIGIN_Y 2047
-#define PIXELS_PER_METER 25
+#define ORIGIN_X 959
+#define ORIGIN_Y 1079
+#define PIXELS_PER_METER 10
 #define STR_WHE_RATIO 60.0f
 
 using namespace std;
