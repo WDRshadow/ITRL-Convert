@@ -5,3 +5,4 @@ pids/
 output/
 run/svea_stream
 run/homography_points.yaml
+__pycache__/
