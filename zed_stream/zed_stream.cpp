@@ -17,35 +17,28 @@
 #define CUDA_STREAMS 8
 #define FORWARD 0
 
-#define DATA_NUM 3
-const int _data_logger_ids[] = {IncPkgNr, Velocity, AX};
-const int _data_logger_type[] = {_TYPE_INT, _TYPE_FLOAT, _TYPE_FLOAT};
-#define DATA_NUM_2 5
-const int _data_logger_ids_2[] = {PkgNr, RefStrAngle, RefThrottle, RefBrk, Direction};
-const int _data_logger_type_2[] = {_TYPE_INT, _TYPE_FLOAT, _TYPE_FLOAT, _TYPE_FLOAT, _TYPE_INT};
-#define DATA_NUM_3 1
-const int _data_logger_ids_3[] = {Latency};
-const int _data_logger_type_3[] = {_TYPE_FLOAT};
+#define DATA_NUM 2
+const int _data_logger_ids[] = {SteeringAngle, Velocity};
+const int _data_logger_type[] = {_TYPE_FLOAT, _TYPE_FLOAT};
+#define DATA_NUM_2 1
+const int _data_logger_ids_2[] = {Latency};
+const int _data_logger_type_2[] = {_TYPE_FLOAT};
 
 bool is_init = false;
 int video_fd;
 SocketBridge *bridge = nullptr;
 SocketBridge *bridge_2 = nullptr;
-SocketBridge *bridge_3 = nullptr;
 char *buffer = nullptr;
 char *buffer_2 = nullptr;
-char *buffer_3 = nullptr;
 bool is_sensor_init = false;
 bool thread_signal = false;
 bool is_thread_running = false;
 bool is_thread_running_2 = false;
-bool is_thread_running_3 = false;
 unsigned char *d_bgra = nullptr;
 unsigned char *rgb = nullptr;
 unsigned char *yuyv = nullptr;
 std::thread sensor_thread;
 std::thread sensor_thread_2;
-std::thread sensor_thread_3;
 
 void capture_frames(const char *video_device, const std::string &ip, int port, bool &signal, int fps, int delay_ms, const char *logger, bool is_hmi, bool is_p_hmi, int scale)
 {
@@ -80,12 +73,10 @@ void capture_frames(const char *video_device, const std::string &ip, int port, b
     std::unique_ptr<SensorAPI> vel;
     std::unique_ptr<SensorAPI> ax;
     std::unique_ptr<SensorAPI> str_whe_phi;
-    std::unique_ptr<SensorAPI> direction;
     std::unique_ptr<DataLogger> data_logger;
     std::unique_ptr<DataLogger> data_logger_2;
     std::shared_mutex bufferMutex;
     std::shared_mutex bufferMutex_2;
-    std::shared_mutex bufferMutex_3;
 
     // Initialize Streaming Component
     bool is_sensor_connected = false;
@@ -100,11 +91,6 @@ void capture_frames(const char *video_device, const std::string &ip, int port, b
         if (bridge_2)
         {
             is_sensor_connected = is_sensor_connected && bridge_2->isValid();
-        }
-        bridge_3 = new SocketBridge(ip, port + 2);
-        if (bridge_3)
-        {
-            is_sensor_connected = is_sensor_connected && bridge_3->isValid();
         }
     }
     if (is_sensor_connected)
@@ -122,11 +108,6 @@ void capture_frames(const char *video_device, const std::string &ip, int port, b
         {
             delete bridge_2;
             bridge_2 = nullptr;
-        }
-        if (bridge_3)
-        {
-            delete bridge_3;
-            bridge_3 = nullptr;
         }
         std::cout << "[zed stream] Sensor data not available." << std::endl;
     }
@@ -200,13 +181,12 @@ void capture_frames(const char *video_device, const std::string &ip, int port, b
             {
                 buffer = new char[BUFFER_SIZE]();
                 buffer_2 = new char[BUFFER_SIZE]();
-                buffer_3 = new char[BUFFER_SIZE]();
                 if (is_hmi || is_p_hmi)
                 {
                     vel = std::make_unique<SensorAPI>(Velocity, buffer, BUFFER_SIZE, bufferMutex);
-                    ax = std::make_unique<SensorAPI>(AX, buffer, BUFFER_SIZE, bufferMutex);
-                    str_whe_phi = std::make_unique<SensorAPI>(RefStrAngle, buffer_2, BUFFER_SIZE, bufferMutex_2);
-                    latency = std::make_unique<SensorAPI>(Latency, buffer_3, BUFFER_SIZE, bufferMutex_3);
+                    ax = std::make_unique<SensorAPI>(Ax, buffer, BUFFER_SIZE, bufferMutex);
+                    str_whe_phi = std::make_unique<SensorAPI>(SteeringAngle, buffer, BUFFER_SIZE, bufferMutex);
+                    latency = std::make_unique<SensorAPI>(Latency, buffer_2, BUFFER_SIZE, bufferMutex_2);
                     stream_image = std::make_unique<StreamImage>(width, height);
                     prediction_line = std::make_shared<PredictionLine>("fisheye_calibration.yaml",
                                                                        "homography_calibration.yaml", width, height);
@@ -231,14 +211,12 @@ void capture_frames(const char *video_device, const std::string &ip, int port, b
                                             std::ref(thread_signal), std::ref(is_thread_running));
                 sensor_thread_2 = std::thread(receive_data_loop, bridge_2, buffer_2, BUFFER_SIZE, std::ref(bufferMutex_2),
                                               std::ref(thread_signal), std::ref(is_thread_running_2));
-                sensor_thread_3 = std::thread(receive_data_loop, bridge_3, buffer_3, BUFFER_SIZE, std::ref(bufferMutex_3),
-                                              std::ref(thread_signal), std::ref(is_thread_running_3));
                 is_sensor_init = true;
             }
             if (is_hmi || is_p_hmi)
             {
                 const auto _vel = vel->get_float_value();
-                const int total_delay = delay_ms + latency->get_int_value() + 80;
+                const int total_delay = delay_ms + latency->get_int_value();
                 if (is_p_hmi)
                 {
                     prediction_line->update(_vel, ax->get_float_value(), str_whe_phi->get_float_value(), str_whe_phi->get_float_value(), total_delay / 1000.0);
@@ -271,25 +249,23 @@ void capture_frames(const char *video_device, const std::string &ip, int port, b
     if (is_sensor_init)
     {
         thread_signal = true;
-        if (sensor_thread.joinable() && sensor_thread_2.joinable() && sensor_thread_3.joinable())
+        if (sensor_thread.joinable() && sensor_thread_2.joinable())
         {
             int count = 0;
-            while ((is_thread_running || is_thread_running_2 || is_thread_running_3) && count++ < 30)
+            while ((is_thread_running || is_thread_running_2) && count++ < 30)
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
-            if (is_thread_running || is_thread_running_2 || is_thread_running_3)
+            if (is_thread_running || is_thread_running_2)
             {
                 std::cerr << "[zed stream] Sensor thread did not exit gracefully" << std::endl;
                 sensor_thread.detach();
                 sensor_thread_2.detach();
-                sensor_thread_3.detach();
             }
             else
             {
                 sensor_thread.join();
                 sensor_thread_2.join();
-                sensor_thread_3.join();
             }
         }
         thread_signal = false;
@@ -297,14 +273,10 @@ void capture_frames(const char *video_device, const std::string &ip, int port, b
         buffer = nullptr;
         delete[] buffer_2;
         buffer_2 = nullptr;
-        delete[] buffer_3;
-        buffer_3 = nullptr;
         delete bridge;
         bridge = nullptr;
         delete bridge_2;
         bridge_2 = nullptr;
-        delete bridge_3;
-        bridge_3 = nullptr;
         is_sensor_init = false;
     }
     if (is_init)
