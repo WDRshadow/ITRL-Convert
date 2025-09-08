@@ -2,12 +2,17 @@
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Int8
+from std_msgs.msg import Int8, Bool
 from nav_msgs.msg import Odometry
 import socket
 import struct
 import math
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 
+qos_profile = QoSProfile(
+    reliability=QoSReliabilityPolicy.BEST_EFFORT,
+    depth=10
+)
 
 class UDPBridgeNode(Node):
     def __init__(self):
@@ -26,13 +31,15 @@ class UDPBridgeNode(Node):
         self.steering_angle = 0.0
         self.velocity_x = 0.0
         
-        self.steering_sub = self.create_subscription(
-            Int8,
-            '/lli/ctrl/steering',
-            self.steering_callback,
-            10
-        )
         
+        
+        self.remote_override_sub = self.create_subscription(
+            Bool,
+            '/lli/remote/override',
+            self.remote_override_callback,
+            qos_profile
+        )
+
         self.odometry_sub = self.create_subscription(
             Odometry,
             '/odometry/local',
@@ -44,6 +51,25 @@ class UDPBridgeNode(Node):
         
         self.get_logger().info(f'UDP Bridge Node started, sending to {self.udp_host}:{self.udp_port}')
         self.get_logger().info(f'Steering coefficient: {self.steering_coeff}')
+
+    def remote_override_callback(self, msg):
+        if msg.data == True:
+            self.steering_sub = self.create_subscription(
+                Int8,
+                '/lli/remote/steering',
+                self.steering_callback,
+                qos_profile
+            )
+            self.get_logger().debug('Switched to remote steering control')
+        else:
+            self.steering_sub = self.create_subscription(
+                Int8,
+                '/lli/ctrl/steering',
+                self.steering_callback,
+                qos_profile
+            )
+            self.get_logger().debug('Switched to local steering control')
+
     
     def steering_callback(self, msg):
         self.steering_angle = float(msg.data) * self.steering_coeff
